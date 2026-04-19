@@ -4,20 +4,31 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { ArrowUp, LogOut, Sparkles, Terminal, Zap } from "lucide-react";
+import { ArrowUp, LogOut, Sparkles, Zap, Plus, Search, PenTool, ListChecks, Code2, Globe, Paperclip, X, MessageSquare, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/app")({
-  head: () => ({ meta: [{ title: "Master Brain — Razen AI" }, { name: "description", content: "Razen AI chat console." }] }),
+  head: () => ({ meta: [{ title: "Razen" }, { name: "description", content: "Your AI employee." }] }),
   validateSearch: (s: Record<string, unknown>) => ({ upgraded: typeof s.upgraded === "string" ? s.upgraded : undefined }),
   component: AppPage,
 });
 
 type Msg = { role: "user" | "assistant"; content: string };
 type Tier = "free" | "pro" | "elite";
+type Mode = "research" | "write" | "plan" | "build";
+type Conv = { id: string; title: string; updated_at: string };
+
+const MODES: { id: Mode; label: string; icon: typeof Search; hint: string }[] = [
+  { id: "research", label: "Research", icon: Search, hint: "Cited research with live web sources" },
+  { id: "write", label: "Write", icon: PenTool, hint: "Editorial-grade drafting and polishing" },
+  { id: "plan", label: "Plan", icon: ListChecks, hint: "Structured plans with owners and risks" },
+  { id: "build", label: "Build", icon: Code2, hint: "Production-quality runnable code" },
+];
+
+const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 function AppPage() {
   const { user, loading, signOut } = useAuth();
@@ -27,7 +38,13 @@ function AppPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [mode, setMode] = useState<Mode>("research");
+  const [useWebSearch, setUseWebSearch] = useState(true);
+  const [attachment, setAttachment] = useState<{ name: string; dataUrl: string; type: string } | null>(null);
+  const [convs, setConvs] = useState<Conv[]>([]);
+  const [convId, setConvId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const search = Route.useSearch() as { upgraded?: string };
 
   useEffect(() => { if (!loading && !user) nav({ to: "/login" }); }, [user, loading, nav]);
@@ -38,29 +55,66 @@ function AppPage() {
     if (typeof data?.balance === "number") setCredits(data.balance);
   };
 
+  const loadConvs = async (uid: string) => {
+    const { data } = await supabase.from("conversations").select("id,title,updated_at").eq("user_id", uid).order("updated_at", { ascending: false }).limit(50);
+    if (data) setConvs(data);
+  };
+
   useEffect(() => {
     if (!user) return;
     supabase.from("subscriptions").select("tier").eq("user_id", user.id).maybeSingle()
       .then(({ data }) => { if (data?.tier) setTier(data.tier as Tier); });
     refreshCredits(user.id);
+    loadConvs(user.id);
   }, [user]);
 
   useEffect(() => {
     if (search?.upgraded) {
-      toast.success("Subscription active. Welcome to the Master Brain.");
+      toast.success("Subscription active. Welcome aboard.");
       nav({ to: "/app", search: {}, replace: true });
     }
   }, [search, nav]);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages]);
 
+  const newChat = () => { setMessages([]); setConvId(null); setInput(""); setAttachment(null); };
+
+  const openConv = async (id: string) => {
+    setConvId(id);
+    const { data } = await supabase.from("messages").select("role,content,created_at").eq("conversation_id", id).order("created_at");
+    if (data) setMessages(data.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })));
+  };
+
+  const deleteConv = async (id: string) => {
+    await supabase.from("messages").delete().eq("conversation_id", id);
+    await supabase.from("conversations").delete().eq("id", id);
+    if (convId === id) newChat();
+    if (user) loadConvs(user.id);
+  };
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (tier === "free") { toast.error("File upload is a Pro feature."); return; }
+    if (f.size > 10 * 1024 * 1024) { toast.error("Max 10MB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => setAttachment({ name: f.name, dataUrl: reader.result as string, type: f.type });
+    reader.readAsDataURL(f);
+  };
+
   const send = async () => {
     const text = input.trim();
-    if (!text || streaming) return;
-    const userMsg: Msg = { role: "user", content: text };
+    if ((!text && !attachment) || streaming || !user) return;
+
+    let userContent = text;
+    if (attachment) userContent = `[Attached: ${attachment.name}]\n\n${text}`;
+
+    const userMsg: Msg = { role: "user", content: userContent };
     const next = [...messages, userMsg];
     setMessages(next);
     setInput("");
+    const att = attachment;
+    setAttachment(null);
     setStreaming(true);
 
     let acc = "";
@@ -73,12 +127,44 @@ function AppPage() {
       });
     };
 
+    // Ensure conversation exists
+    let cid = convId;
+    if (!cid) {
+      const title = text.slice(0, 60) || "New chat";
+      const { data: created } = await supabase.from("conversations").insert({ user_id: user.id, title }).select("id").single();
+      if (created) { cid = created.id; setConvId(cid); }
+    } else {
+      await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", cid);
+    }
+
+    if (cid) {
+      await supabase.from("messages").insert({ conversation_id: cid, user_id: user.id, role: "user", content: userContent });
+    }
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const resp = await fetch("/api/chat", {
+
+      // For multimodal messages with attachment, use OpenAI-style content array
+      const apiMessages = next.map((m, i) => {
+        if (i === next.length - 1 && att) {
+          return {
+            role: m.role,
+            content: [
+              { type: "text", text: text || "Analyse this." },
+              { type: "image_url", image_url: { url: att.dataUrl } },
+            ],
+          };
+        }
+        return m;
+      });
+
+      const resp = await fetch(FN_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
-        body: JSON.stringify({ messages: next }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ messages: apiMessages, mode, useWebSearch }),
       });
 
       const remaining = resp.headers.get("X-Credits-Remaining");
@@ -87,9 +173,7 @@ function AppPage() {
       if (!resp.ok) {
         let msg = `Error ${resp.status}`;
         try { const e = await resp.json(); if (e.error) msg = e.error; } catch { /* ignore */ }
-        if (resp.status === 402) toast.error(msg);
-        else if (resp.status === 429) toast.error("Rate limited. Try again in a moment.");
-        else toast.error(msg);
+        toast.error(msg);
         setStreaming(false);
         return;
       }
@@ -122,6 +206,12 @@ function AppPage() {
           }
         }
       }
+
+      // Persist assistant message
+      if (cid && acc) {
+        await supabase.from("messages").insert({ conversation_id: cid, user_id: user.id, role: "assistant", content: acc });
+        loadConvs(user.id);
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Stream failed");
     } finally {
@@ -130,83 +220,195 @@ function AppPage() {
   };
 
   if (loading || !user) {
-    return <div className="flex min-h-screen items-center justify-center font-mono text-xs text-muted-foreground">[booting…]</div>;
+    return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Loading…</div>;
   }
 
+  const ModeIcon = MODES.find((m) => m.id === mode)?.icon ?? Search;
+
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
-          <Link to="/" className="flex items-center gap-2 font-mono text-sm font-semibold">
-            <Terminal className="h-4 w-4 text-primary" />
-            <span>razen<span className="text-primary">/</span>ai</span>
+    <div className="flex min-h-screen">
+      {/* Sidebar */}
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-border/60 bg-card/40 md:flex">
+        <div className="flex items-center justify-between p-4">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="grid h-7 w-7 place-items-center rounded-md bg-foreground text-background font-display text-sm">R</div>
+            <span className="font-display text-lg">Razen</span>
           </Link>
+        </div>
+        <div className="px-3">
+          <Button onClick={newChat} variant="outline" className="w-full justify-start gap-2"><Plus className="h-4 w-4" />New chat</Button>
+        </div>
+        <div className="mt-4 flex-1 overflow-y-auto px-2 pb-2">
+          <p className="px-2 pb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Recent</p>
+          {convs.length === 0 ? (
+            <p className="px-2 text-xs text-muted-foreground">No chats yet.</p>
+          ) : convs.map((c) => (
+            <div key={c.id} className={`group flex items-center gap-1 rounded-md px-1 ${convId === c.id ? "bg-muted" : ""}`}>
+              <button
+                onClick={() => openConv(c.id)}
+                className="flex-1 truncate rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
+              >
+                <MessageSquare className="mr-2 inline h-3.5 w-3.5 text-muted-foreground" />
+                {c.title}
+              </button>
+              <button onClick={() => deleteConv(c.id)} className="opacity-0 transition group-hover:opacity-100">
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-border/60 p-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs">
+              <div className="font-medium capitalize">{tier} plan</div>
+              {credits !== null && <div className="text-muted-foreground">{credits.toLocaleString()} credits</div>}
+            </div>
+            {tier === "free" && (
+              <Link to="/pricing"><Button size="sm" variant="outline" className="h-8"><Sparkles className="mr-1 h-3 w-3" />Upgrade</Button></Link>
+            )}
+          </div>
+          <Button size="sm" variant="ghost" className="mt-2 h-8 w-full justify-start text-muted-foreground" onClick={signOut}>
+            <LogOut className="mr-2 h-3.5 w-3.5" />Sign out
+          </Button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="flex flex-1 flex-col">
+        <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-md md:px-6">
           <div className="flex items-center gap-2">
+            {/* Mode picker */}
+            <div className="flex items-center gap-1 rounded-full border border-border/70 bg-card p-1 shadow-soft">
+              {MODES.map((m) => {
+                const Active = m.icon;
+                const active = mode === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setMode(m.id)}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition ${
+                      active ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    title={m.hint}
+                  >
+                    <Active className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">{m.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 md:hidden">
             {credits !== null && (
-              <span className="flex items-center gap-1 rounded-sm border border-border/60 bg-muted/30 px-2 py-0.5 font-mono text-[10px] text-muted-foreground" title="Credits remaining">
-                <Zap className="h-3 w-3 text-primary" />
-                <span className="text-foreground">{credits.toLocaleString()}</span>
+              <span className="flex items-center gap-1 rounded-full border border-border/60 bg-card px-2.5 py-1 text-xs">
+                <Zap className="h-3 w-3 text-primary" />{credits.toLocaleString()}
               </span>
             )}
-            <span className="rounded-sm border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">{tier}</span>
-            {tier === "free" && (
-              <Link to="/pricing"><Button size="sm" variant="ghost" className="h-8 font-mono text-xs"><Sparkles className="mr-1 h-3 w-3" />upgrade</Button></Link>
-            )}
-            <Button size="sm" variant="ghost" className="h-8 font-mono text-xs" onClick={signOut}><LogOut className="h-3 w-3" /></Button>
+            <Button size="sm" variant="ghost" onClick={signOut}><LogOut className="h-4 w-4" /></Button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-4 py-8">
-          {messages.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="font-mono text-xs text-primary">[READY]</p>
-              <h2 className="mt-3 font-display text-4xl md:text-5xl">master_brain.</h2>
-              <p className="mt-3 font-mono text-xs text-muted-foreground">Ask anything. Research, code, plan.<span className="terminal-cursor" /></p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {messages.map((m, i) => (
-                <div key={i} className={m.role === "user" ? "flex justify-end" : ""}>
-                  <div className={m.role === "user"
-                    ? "max-w-[85%] rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 font-mono text-sm"
-                    : "max-w-full"
-                  }>
-                    {m.role === "assistant" ? (
-                      <div className="prose-chat font-mono text-sm">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{m.content || "…"}</ReactMarkdown>
-                      </div>
-                    ) : m.content}
-                  </div>
+        <div ref={scrollRef} className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-3xl px-4 py-10 md:px-6">
+            {messages.length === 0 ? (
+              <div className="py-16 text-center">
+                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-foreground text-background">
+                  <ModeIcon className="h-6 w-6" />
                 </div>
-              ))}
-              {streaming && messages[messages.length - 1]?.role === "user" && (
-                <div className="font-mono text-xs text-muted-foreground"><span className="terminal-cursor">thinking</span></div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="sticky bottom-0 border-t border-border/60 bg-background/90 backdrop-blur-md">
-        <div className="mx-auto max-w-3xl px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <div className="flex items-end gap-2 rounded-lg p-2 terminal-border">
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder="$ ask the brain…"
-              rows={1}
-              className="min-h-[40px] flex-1 resize-none border-0 bg-transparent font-mono text-sm focus-visible:ring-0"
-            />
-            <Button onClick={send} disabled={!input.trim() || streaming} size="icon" className="h-9 w-9 shrink-0">
-              <ArrowUp className="h-4 w-4" />
-            </Button>
+                <h2 className="mt-6 font-display text-4xl md:text-5xl">{MODES.find((m) => m.id === mode)?.label} mode.</h2>
+                <p className="mt-3 text-muted-foreground">{MODES.find((m) => m.id === mode)?.hint}</p>
+                <div className="mt-10 grid gap-3 text-left sm:grid-cols-2">
+                  {modePrompts(mode).map((p) => (
+                    <button key={p} onClick={() => setInput(p)} className="rounded-xl border border-border/70 bg-card/60 p-4 text-sm text-foreground/80 transition hover:bg-card hover:shadow-soft">
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {messages.map((m, i) => (
+                  <div key={i} className={m.role === "user" ? "flex justify-end" : ""}>
+                    <div className={m.role === "user"
+                      ? "max-w-[85%] rounded-2xl bg-foreground px-4 py-3 text-sm text-background"
+                      : "max-w-full"
+                    }>
+                      {m.role === "assistant" ? (
+                        <div className="prose-chat">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{m.content || "…"}</ReactMarkdown>
+                        </div>
+                      ) : <span className="whitespace-pre-wrap">{m.content}</span>}
+                    </div>
+                  </div>
+                ))}
+                {streaming && messages[messages.length - 1]?.role === "user" && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+                    Thinking…
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <p className="mt-2 text-center font-mono text-[10px] text-muted-foreground">enter to send · shift+enter for newline</p>
+        </div>
+
+        <div className="sticky bottom-0 border-t border-border/60 bg-background/90 backdrop-blur-md">
+          <div className="mx-auto max-w-3xl px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">
+            {attachment && (
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1 text-xs">
+                <Paperclip className="h-3 w-3" />{attachment.name}
+                <button onClick={() => setAttachment(null)}><X className="h-3 w-3" /></button>
+              </div>
+            )}
+            <div className="rounded-2xl border border-border/70 bg-card shadow-soft transition focus-within:border-primary/40 focus-within:shadow-card">
+              <Textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder={`Ask Razen — ${mode} mode`}
+                rows={1}
+                className="min-h-[52px] resize-none border-0 bg-transparent px-4 py-3.5 text-base focus-visible:ring-0"
+              />
+              <div className="flex items-center justify-between gap-2 px-3 pb-2.5">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    title={tier === "free" ? "Upgrade to Pro for files" : "Attach file or image"}
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </button>
+                  <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={onFile} className="hidden" />
+                  <button
+                    onClick={() => setUseWebSearch((v) => !v)}
+                    className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition ${
+                      useWebSearch ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
+                    }`}
+                    title="Toggle live web search"
+                  >
+                    <Globe className="h-3.5 w-3.5" />Web
+                  </button>
+                </div>
+                <Button onClick={send} disabled={(!input.trim() && !attachment) || streaming} size="icon" className="h-9 w-9 rounded-full">
+                  <ArrowUp className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              {credits !== null ? `${credits.toLocaleString()} credits left · ` : ""}Razen can make mistakes. Verify important info.
+            </p>
+          </div>
         </div>
       </div>
     </div>
   );
+}
+
+function modePrompts(mode: Mode): string[] {
+  switch (mode) {
+    case "research": return ["Compare Cursor, Windsurf, and Zed for a TypeScript team.", "What are the latest funding rounds in AI agents this quarter?"];
+    case "write": return ["Draft a cold email to enterprise heads of operations.", "Rewrite this paragraph in the voice of The Economist."];
+    case "plan": return ["Plan a 30-day launch for a new SaaS pricing page.", "Break a website redesign into a 2-week sprint."];
+    case "build": return ["Write a TypeScript Zod schema for a Stripe webhook.", "Debug a flaky React useEffect race condition."];
+  }
 }
