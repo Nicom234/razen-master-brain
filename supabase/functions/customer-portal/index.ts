@@ -14,7 +14,7 @@ serve(async (req) => {
     const auth = req.headers.get("authorization");
     if (!auth?.startsWith("Bearer ")) return j({ error: "Sign in required" }, 401);
 
-    const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!);
+    const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!);
     const { data: u } = await userClient.auth.getUser(auth.slice(7));
     const user = u.user;
     if (!user) return j({ error: "Sign in required" }, 401);
