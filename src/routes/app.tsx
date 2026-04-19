@@ -78,13 +78,18 @@ function AppPage() {
       const resp = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
-        body: JSON.stringify({ messages: next, tier }),
+        body: JSON.stringify({ messages: next }),
       });
 
+      const remaining = resp.headers.get("X-Credits-Remaining");
+      if (remaining) setCredits(Number(remaining));
+
       if (!resp.ok) {
-        if (resp.status === 429) toast.error("Rate limited. Try again in a moment.");
-        else if (resp.status === 402) toast.error("AI credits exhausted. Upgrade or add credits.");
-        else toast.error(`Error ${resp.status}`);
+        let msg = `Error ${resp.status}`;
+        try { const e = await resp.json(); if (e.error) msg = e.error; } catch { /* ignore */ }
+        if (resp.status === 402) toast.error(msg);
+        else if (resp.status === 429) toast.error("Rate limited. Try again in a moment.");
+        else toast.error(msg);
         setStreaming(false);
         return;
       }
@@ -137,6 +142,12 @@ function AppPage() {
             <span>razen<span className="text-primary">/</span>ai</span>
           </Link>
           <div className="flex items-center gap-2">
+            {credits !== null && (
+              <span className="flex items-center gap-1 rounded-sm border border-border/60 bg-muted/30 px-2 py-0.5 font-mono text-[10px] text-muted-foreground" title="Credits remaining">
+                <Zap className="h-3 w-3 text-primary" />
+                <span className="text-foreground">{credits.toLocaleString()}</span>
+              </span>
+            )}
             <span className="rounded-sm border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">{tier}</span>
             {tier === "free" && (
               <Link to="/pricing"><Button size="sm" variant="ghost" className="h-8 font-mono text-xs"><Sparkles className="mr-1 h-3 w-3" />upgrade</Button></Link>
