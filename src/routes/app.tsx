@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { ArrowUp, LogOut, Sparkles, Terminal } from "lucide-react";
+import { ArrowUp, LogOut, Sparkles, Terminal, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
@@ -23,6 +23,7 @@ function AppPage() {
   const { user, loading, signOut } = useAuth();
   const nav = useNavigate();
   const [tier, setTier] = useState<Tier>("free");
+  const [credits, setCredits] = useState<number | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -31,10 +32,17 @@ function AppPage() {
 
   useEffect(() => { if (!loading && !user) nav({ to: "/login" }); }, [user, loading, nav]);
 
+  const refreshCredits = async (uid: string) => {
+    await supabase.rpc("ensure_credits", { _user_id: uid });
+    const { data } = await supabase.from("credits").select("balance").eq("user_id", uid).maybeSingle();
+    if (typeof data?.balance === "number") setCredits(data.balance);
+  };
+
   useEffect(() => {
     if (!user) return;
     supabase.from("subscriptions").select("tier").eq("user_id", user.id).maybeSingle()
       .then(({ data }) => { if (data?.tier) setTier(data.tier as Tier); });
+    refreshCredits(user.id);
   }, [user]);
 
   useEffect(() => {
