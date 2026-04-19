@@ -4,12 +4,13 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { ArrowUp, LogOut, Sparkles, Zap, Plus, Search, PenTool, ListChecks, Code2, Globe, Paperclip, X, MessageSquare, Trash2, Settings } from "lucide-react";
+import { ArrowUp, LogOut, Sparkles, Zap, Plus, Search, PenTool, ListChecks, Code2, Globe, Paperclip, X, MessageSquare, Trash2, Settings, Brain, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { stripeEnv } from "@/lib/stripe";
+import { MemoryPanel } from "@/components/MemoryPanel";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Razen" }, { name: "description", content: "Your AI employee." }] }),
@@ -44,9 +45,22 @@ function AppPage() {
   const [attachment, setAttachment] = useState<{ name: string; dataUrl: string; type: string } | null>(null);
   const [convs, setConvs] = useState<Conv[]>([]);
   const [convId, setConvId] = useState<string | null>(null);
+  const [memOpen, setMemOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const search = Route.useSearch() as { upgraded?: string };
+
+  const exportChat = () => {
+    if (messages.length === 0) { toast.error("Nothing to export yet."); return; }
+    const md = messages.map((m) => `## ${m.role === "user" ? "You" : "Razen"}\n\n${m.content}`).join("\n\n---\n\n");
+    const blob = new Blob([`# Razen chat — ${new Date().toLocaleString()}\n\n${md}`], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `razen-${Date.now()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => { if (!loading && !user) nav({ to: "/login" }); }, [user, loading, nav]);
 
@@ -282,8 +296,11 @@ function AppPage() {
               <Link to="/pricing"><Button size="sm" variant="outline" className="h-8"><Sparkles className="mr-1 h-3 w-3" />Upgrade</Button></Link>
             )}
           </div>
+          <Button size="sm" variant="ghost" className="mt-2 h-8 w-full justify-start text-muted-foreground" onClick={() => setMemOpen(true)}>
+            <Brain className="mr-2 h-3.5 w-3.5" />Memory{tier !== "elite" && <span className="ml-auto text-[10px] uppercase tracking-wide text-primary">Elite</span>}
+          </Button>
           {tier !== "free" && (
-            <Button size="sm" variant="ghost" className="mt-2 h-8 w-full justify-start text-muted-foreground" onClick={openPortal}>
+            <Button size="sm" variant="ghost" className="mt-1 h-8 w-full justify-start text-muted-foreground" onClick={openPortal}>
               <Settings className="mr-2 h-3.5 w-3.5" />Manage subscription
             </Button>
           )}
@@ -292,6 +309,8 @@ function AppPage() {
           </Button>
         </div>
       </aside>
+
+      {memOpen && user && <MemoryPanel userId={user.id} tier={tier} onClose={() => setMemOpen(false)} />}
 
       {/* Main */}
       <div className="flex flex-1 flex-col">
@@ -318,13 +337,23 @@ function AppPage() {
               })}
             </div>
           </div>
-          <div className="flex items-center gap-2 md:hidden">
-            {credits !== null && (
-              <span className="flex items-center gap-1 rounded-full border border-border/60 bg-card px-2.5 py-1 text-xs">
-                <Zap className="h-3 w-3 text-primary" />{credits.toLocaleString()}
-              </span>
+          <div className="flex items-center gap-1.5">
+            {messages.length > 0 && (
+              <Button size="sm" variant="ghost" className="h-9 px-2.5 text-xs text-muted-foreground" onClick={exportChat} title="Export chat as Markdown">
+                <Download className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Export</span>
+              </Button>
             )}
-            <Button size="sm" variant="ghost" onClick={signOut}><LogOut className="h-4 w-4" /></Button>
+            <div className="flex items-center gap-2 md:hidden">
+              {credits !== null && (
+                <span className="flex items-center gap-1 rounded-full border border-border/60 bg-card px-2.5 py-1 text-xs">
+                  <Zap className="h-3 w-3 text-primary" />{credits.toLocaleString()}
+                </span>
+              )}
+              {tier === "free" && (
+                <Link to="/pricing"><Button size="sm" className="h-8"><Sparkles className="mr-1 h-3 w-3" />Upgrade</Button></Link>
+              )}
+              <Button size="sm" variant="ghost" onClick={signOut}><LogOut className="h-4 w-4" /></Button>
+            </div>
           </div>
         </header>
 

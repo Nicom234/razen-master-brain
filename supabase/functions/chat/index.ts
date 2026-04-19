@@ -5,6 +5,7 @@ const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Expose-Headers": "X-Credits-Remaining",
 };
 
 const SYSTEMS: Record<string, string> = {
@@ -14,11 +15,18 @@ const SYSTEMS: Record<string, string> = {
   plan: `You are Razen — Plan mode. You're a McKinsey-trained chief of staff. Turn ambiguity into structure. Always output: 1) Goal (one sentence). 2) Assumptions. 3) Step-by-step plan with owners and timing. 4) Risks + mitigations. 5) Definition of done. Use tight bullets. Push back if the goal is unclear.`,
 };
 
-const MODELS: Record<string, string> = {
-  free: "google/gemini-2.5-flash",
-  pro: "google/gemini-2.5-pro",
-  elite: "google/gemini-2.5-pro",
-};
+// Model routing — Elite gets the strongest reasoning model, Pro gets a fast premium model, Free stays on Flash.
+function pickModel(tier: string, mode: string): string {
+  if (tier === "elite") {
+    if (mode === "build" || mode === "plan") return "openai/gpt-5";
+    return "google/gemini-2.5-pro";
+  }
+  if (tier === "pro") {
+    if (mode === "build") return "openai/gpt-5-mini";
+    return "google/gemini-2.5-pro";
+  }
+  return "google/gemini-2.5-flash";
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
@@ -41,15 +49,29 @@ serve(async (req) => {
     const { data: newBal, error: dErr } = await admin.rpc("deduct_credit", { _user_id: user.id });
     if (dErr) { console.error("deduct", dErr); return j({ error: "Credit check failed" }, 500); }
     if (typeof newBal === "number" && newBal < 0) {
-      return j({ error: tier === "free" ? "Out of credits — refills tomorrow, or upgrade for instant access." : "Out of credits. Upgrade your plan." }, 402);
+      return j({ error: tier === "free" ? "Out of credits — refills tomorrow, or upgrade for instant access." : "Out of credits. Upgrade your plan or wait for next month's reset." }, 402);
     }
 
     const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_KEY) return j({ error: "AI not configured" }, 500);
 
-    const model = MODELS[tier] ?? MODELS.free;
     const m = (mode as keyof typeof SYSTEMS) || "research";
-    const system = SYSTEMS[m] || SYSTEMS.research;
+    const model = pickModel(tier, m);
+    const baseSystem = SYSTEMS[m] || SYSTEMS.research;
+
+    // Inject memory for Elite users (long-term memory is the killer feature)
+    let memoryBlock = "";
+    if (tier === "elite") {
+      const { data: mems } = await admin.from("memories").select("content").eq("user_id", user.id).order("created_at", { ascending: false }).limit(40);
+      if (mems && mems.length) {
+        memoryBlock = `\n\n# What you remember about this user\n` +
+          mems.map((row, i) => `${i + 1}. ${row.content}`).join("\n") +
+          `\n\nUse these facts naturally. Don't recite them — use them to personalise voice, recall projects, and skip context the user has already given you.`;
+      }
+    }
+
+    const tierTag = `\n\n# Tier\nThe user is on the ${tier.toUpperCase()} plan.${tier === "elite" ? " Treat them as a power user — be denser, faster, more decisive." : ""}`;
+    const system = baseSystem + memoryBlock + tierTag;
 
     const body: Record<string, unknown> = {
       model,
@@ -81,6 +103,7 @@ serve(async (req) => {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         "X-Credits-Remaining": String(newBal ?? 0),
+        "X-Model": model,
       },
     });
   } catch (e) {
