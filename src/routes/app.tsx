@@ -4,12 +4,13 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { ArrowUp, LogOut, Sparkles, Zap, Plus, Search, PenTool, ListChecks, Code2, Globe, Paperclip, X, MessageSquare, Trash2, Settings } from "lucide-react";
+import { ArrowUp, LogOut, Sparkles, Zap, Plus, Search, PenTool, ListChecks, Code2, Globe, Paperclip, X, MessageSquare, Trash2, Settings, Brain, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { stripeEnv } from "@/lib/stripe";
+import { MemoryPanel } from "@/components/MemoryPanel";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Razen" }, { name: "description", content: "Your AI employee." }] }),
@@ -44,9 +45,22 @@ function AppPage() {
   const [attachment, setAttachment] = useState<{ name: string; dataUrl: string; type: string } | null>(null);
   const [convs, setConvs] = useState<Conv[]>([]);
   const [convId, setConvId] = useState<string | null>(null);
+  const [memOpen, setMemOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const search = Route.useSearch() as { upgraded?: string };
+
+  const exportChat = () => {
+    if (messages.length === 0) { toast.error("Nothing to export yet."); return; }
+    const md = messages.map((m) => `## ${m.role === "user" ? "You" : "Razen"}\n\n${m.content}`).join("\n\n---\n\n");
+    const blob = new Blob([`# Razen chat — ${new Date().toLocaleString()}\n\n${md}`], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `razen-${Date.now()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => { if (!loading && !user) nav({ to: "/login" }); }, [user, loading, nav]);
 
