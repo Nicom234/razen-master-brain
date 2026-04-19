@@ -296,8 +296,11 @@ function AppPage() {
               <Link to="/pricing"><Button size="sm" variant="outline" className="h-8"><Sparkles className="mr-1 h-3 w-3" />Upgrade</Button></Link>
             )}
           </div>
+          <Button size="sm" variant="ghost" className="mt-2 h-8 w-full justify-start text-muted-foreground" onClick={() => setMemOpen(true)}>
+            <Brain className="mr-2 h-3.5 w-3.5" />Memory{tier !== "elite" && <span className="ml-auto text-[10px] uppercase tracking-wide text-primary">Elite</span>}
+          </Button>
           {tier !== "free" && (
-            <Button size="sm" variant="ghost" className="mt-2 h-8 w-full justify-start text-muted-foreground" onClick={openPortal}>
+            <Button size="sm" variant="ghost" className="mt-1 h-8 w-full justify-start text-muted-foreground" onClick={openPortal}>
               <Settings className="mr-2 h-3.5 w-3.5" />Manage subscription
             </Button>
           )}
@@ -306,6 +309,8 @@ function AppPage() {
           </Button>
         </div>
       </aside>
+
+      {memOpen && user && <MemoryPanel userId={user.id} tier={tier} onClose={() => setMemOpen(false)} />}
 
       {/* Main */}
       <div className="flex flex-1 flex-col">
@@ -332,13 +337,23 @@ function AppPage() {
               })}
             </div>
           </div>
-          <div className="flex items-center gap-2 md:hidden">
-            {credits !== null && (
-              <span className="flex items-center gap-1 rounded-full border border-border/60 bg-card px-2.5 py-1 text-xs">
-                <Zap className="h-3 w-3 text-primary" />{credits.toLocaleString()}
-              </span>
+          <div className="flex items-center gap-1.5">
+            {messages.length > 0 && (
+              <Button size="sm" variant="ghost" className="h-9 px-2.5 text-xs text-muted-foreground" onClick={exportChat} title="Export chat as Markdown">
+                <Download className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Export</span>
+              </Button>
             )}
-            <Button size="sm" variant="ghost" onClick={signOut}><LogOut className="h-4 w-4" /></Button>
+            <div className="flex items-center gap-2 md:hidden">
+              {credits !== null && (
+                <span className="flex items-center gap-1 rounded-full border border-border/60 bg-card px-2.5 py-1 text-xs">
+                  <Zap className="h-3 w-3 text-primary" />{credits.toLocaleString()}
+                </span>
+              )}
+              {tier === "free" && (
+                <Link to="/pricing"><Button size="sm" className="h-8"><Sparkles className="mr-1 h-3 w-3" />Upgrade</Button></Link>
+              )}
+              <Button size="sm" variant="ghost" onClick={signOut}><LogOut className="h-4 w-4" /></Button>
+            </div>
           </div>
         </header>
 
