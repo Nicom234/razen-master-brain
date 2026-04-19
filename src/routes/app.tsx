@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Master Brain — Razen AI" }, { name: "description", content: "Razen AI chat console." }] }),
+  validateSearch: (s: Record<string, unknown>) => ({ upgraded: typeof s.upgraded === "string" ? s.upgraded : undefined }),
   component: AppPage,
 });
 
