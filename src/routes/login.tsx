@@ -10,7 +10,7 @@ import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Login — Razen AI" }, { name: "description", content: "Access the Master Brain." }] }),
+  head: () => ({ meta: [{ title: "Sign in — Razen" }, { name: "description", content: "Sign in to Razen." }] }),
   component: Login,
 });
 
@@ -33,38 +33,36 @@ function Login() {
   };
 
   const google = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/app`,
-    });
-    if (result.error) { toast.error(result.error.message); return; }
-    if (result.redirected) return;
+    const r = await lovable.auth.signInWithOAuth("google", { redirect_uri: `${window.location.origin}/app` });
+    if (r.error) { toast.error(r.error.message); return; }
+    if (r.redirected) return;
     nav({ to: "/app" });
   };
 
   return (
     <div className="min-h-screen">
       <Nav />
-      <div className="mx-auto flex max-w-md flex-col px-4 py-16">
-        <p className="font-mono text-xs text-primary">// auth/login</p>
-        <h1 className="mt-2 font-display text-5xl">login.</h1>
-        <form onSubmit={submit} className="mt-8 space-y-4 rounded p-6 terminal-border">
+      <div className="mx-auto flex max-w-md flex-col px-5 py-16">
+        <h1 className="font-display text-5xl">Welcome back.</h1>
+        <p className="mt-3 text-muted-foreground">Sign in to continue.</p>
+        <form onSubmit={submit} className="mt-8 space-y-4 rounded-2xl border border-border/70 bg-card/70 p-7 shadow-soft">
           <div className="space-y-2">
-            <Label htmlFor="email" className="font-mono text-xs">email</Label>
-            <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="font-mono" />
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <div className="flex justify-between">
-              <Label htmlFor="password" className="font-mono text-xs">password</Label>
-              <Link to="/forgot-password" className="font-mono text-xs text-primary underline-offset-4 hover:underline">forgot?</Link>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link to="/forgot-password" className="text-xs text-primary underline-offset-4 hover:underline">Forgot?</Link>
             </div>
-            <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="font-mono" />
+            <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
-          <Button type="submit" disabled={loading} className="w-full font-mono">{loading ? "auth…" : "$ login"}</Button>
-          <div className="relative py-2 text-center"><span className="font-mono text-[10px] text-muted-foreground">— or —</span></div>
-          <Button type="button" variant="outline" onClick={google} className="w-full font-mono">continue_with_google</Button>
+          <Button type="submit" disabled={loading} className="h-11 w-full">{loading ? "Signing in…" : "Sign in"}</Button>
+          <div className="relative py-1 text-center"><span className="text-xs text-muted-foreground">or</span></div>
+          <Button type="button" variant="outline" onClick={google} className="h-11 w-full">Continue with Google</Button>
         </form>
-        <p className="mt-6 text-center font-mono text-xs text-muted-foreground">
-          no account? <Link to="/signup" className="text-primary underline underline-offset-4">signup →</Link>
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          New to Razen? <Link to="/signup" className="text-primary underline underline-offset-4">Create an account</Link>
         </p>
       </div>
     </div>
