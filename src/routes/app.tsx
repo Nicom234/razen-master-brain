@@ -4,11 +4,12 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { ArrowUp, LogOut, Sparkles, Zap, Plus, Search, PenTool, ListChecks, Code2, Globe, Paperclip, X, MessageSquare, Trash2 } from "lucide-react";
+import { ArrowUp, LogOut, Sparkles, Zap, Plus, Search, PenTool, ListChecks, Code2, Globe, Paperclip, X, MessageSquare, Trash2, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
+import { stripeEnv } from "@/lib/stripe";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Razen" }, { name: "description", content: "Your AI employee." }] }),
@@ -78,6 +79,20 @@ function AppPage() {
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages]);
 
   const newChat = () => { setMessages([]); setConvId(null); setInput(""); setAttachment(null); };
+
+  const openPortal = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke("customer-portal", {
+        body: { environment: stripeEnv, returnUrl: `${window.location.origin}/app` },
+        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+      });
+      if (error || !data?.url) throw new Error(error?.message || data?.error || "Could not open portal");
+      window.open(data.url, "_blank");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Portal failed");
+    }
+  };
 
   const openConv = async (id: string) => {
     setConvId(id);
@@ -267,7 +282,12 @@ function AppPage() {
               <Link to="/pricing"><Button size="sm" variant="outline" className="h-8"><Sparkles className="mr-1 h-3 w-3" />Upgrade</Button></Link>
             )}
           </div>
-          <Button size="sm" variant="ghost" className="mt-2 h-8 w-full justify-start text-muted-foreground" onClick={signOut}>
+          {tier !== "free" && (
+            <Button size="sm" variant="ghost" className="mt-2 h-8 w-full justify-start text-muted-foreground" onClick={openPortal}>
+              <Settings className="mr-2 h-3.5 w-3.5" />Manage subscription
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" className="mt-1 h-8 w-full justify-start text-muted-foreground" onClick={signOut}>
             <LogOut className="mr-2 h-3.5 w-3.5" />Sign out
           </Button>
         </div>
