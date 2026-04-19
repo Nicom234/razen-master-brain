@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -7,7 +8,7 @@ const cors = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-const SYSTEM = "You are Razen AI — the Master Brain. Single unified agent. Research the live web, execute real actions, reason across long horizons. Direct, technical, useful. Markdown. Cite sources.";
+const SYSTEM = "You are Razen AI — the Master Brain. Single unified agent. Research, reason, build. Direct, technical, useful. Markdown. Cite sources when relevant.";
 
 const ANTHROPIC_MODELS: Record<string, string> = {
   pro: "claude-3-5-sonnet-20241022",
@@ -15,6 +16,7 @@ const ANTHROPIC_MODELS: Record<string, string> = {
 };
 
 type Msg = { role: "user" | "assistant" | "system"; content: string };
+type Tier = "free" | "pro" | "elite";
 
 export const Route = createFileRoute("/api/chat")({
   server: {
@@ -22,100 +24,90 @@ export const Route = createFileRoute("/api/chat")({
       OPTIONS: async () => new Response(null, { status: 204, headers: cors }),
       POST: async ({ request }) => {
         try {
-          const { messages, tier } = (await request.json()) as { messages: Msg[]; tier: "free" | "pro" | "elite" };
-          if (!Array.isArray(messages) || messages.length === 0) {
-            return json({ error: "messages required" }, 400);
-          }
+          const { messages } = (await request.json()) as { messages: Msg[] };
+          if (!Array.isArray(messages) || messages.length === 0) return j({ error: "messages required" }, 400);
 
-          // Auth: identify user (best effort)
-          let userId: string | null = null;
+          // Auth required
           const auth = request.headers.get("authorization");
-          if (auth?.startsWith("Bearer ")) {
-            try {
-              const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!);
-              const { data } = await supabase.auth.getUser(auth.slice(7));
-              userId = data.user?.id ?? null;
-            } catch { /* ignore */ }
+          if (!auth?.startsWith("Bearer ")) return j({ error: "Sign in required" }, 401);
+
+          const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!);
+          const { data: u } = await supabase.auth.getUser(auth.slice(7));
+          const user = u.user;
+          if (!user) return j({ error: "Sign in required" }, 401);
+
+          // Tier
+          const { data: sub } = await supabaseAdmin.from("subscriptions").select("tier").eq("user_id", user.id).maybeSingle();
+          const tier: Tier = (sub?.tier as Tier) ?? "free";
+
+          // Deduct credit (atomic; refills daily for free)
+          const { data: newBal, error: dErr } = await supabaseAdmin.rpc("deduct_credit", { _user_id: user.id });
+          if (dErr) { console.error("deduct error", dErr); return j({ error: "Credit check failed" }, 500); }
+          if (typeof newBal === "number" && newBal < 0) {
+            return j({ error: tier === "free" ? "Out of daily credits. Upgrade or come back tomorrow." : "Out of credits. Upgrade your plan." }, 402);
           }
-          // Free tier requires auth (prevents abuse). Allow unauth to fail soft → free Lovable AI.
-          void userId;
 
           const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
           const useAnthropic = (tier === "pro" || tier === "elite") && !!ANTHROPIC_KEY;
 
-          if (useAnthropic) {
-            return await streamAnthropic(messages, ANTHROPIC_MODELS[tier]);
-          }
-          return await streamLovableAI(messages);
+          const balanceHeader = { "X-Credits-Remaining": String(newBal ?? 0) };
+          if (useAnthropic) return await streamAnthropic(messages, ANTHROPIC_MODELS[tier], balanceHeader);
+          return await streamLovableAI(messages, balanceHeader);
         } catch (e) {
           console.error("chat error", e);
-          return json({ error: e instanceof Error ? e.message : "unknown" }, 500);
+          return j({ error: e instanceof Error ? e.message : "unknown" }, 500);
         }
       },
     },
   },
 });
 
-function json(body: unknown, status = 200) {
+function j(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...cors } });
 }
 
-async function streamLovableAI(messages: Msg[]) {
+async function streamLovableAI(messages: Msg[], extra: Record<string, string>) {
   const key = process.env.LOVABLE_API_KEY;
-  if (!key) return json({ error: "LOVABLE_API_KEY missing" }, 500);
+  if (!key) return j({ error: "LOVABLE_API_KEY missing" }, 500);
   const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
+      model: "google/gemini-2.5-flash",
       stream: true,
       messages: [{ role: "system", content: SYSTEM }, ...messages],
     }),
   });
   if (!upstream.ok) {
-    if (upstream.status === 429) return json({ error: "Rate limited" }, 429);
-    if (upstream.status === 402) return json({ error: "Credits exhausted" }, 402);
+    if (upstream.status === 429) return j({ error: "Rate limited" }, 429);
+    if (upstream.status === 402) return j({ error: "AI credits exhausted" }, 402);
     const t = await upstream.text();
     console.error("lovable ai error", upstream.status, t);
-    return json({ error: "AI gateway error" }, 500);
+    return j({ error: "AI gateway error" }, 500);
   }
   return new Response(upstream.body, {
-    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", ...cors },
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", ...cors, ...extra },
   });
 }
 
-async function streamAnthropic(messages: Msg[], model: string) {
+async function streamAnthropic(messages: Msg[], model: string, extra: Record<string, string>) {
   const key = process.env.ANTHROPIC_API_KEY!;
-  // Anthropic format: system separate; messages alternate user/assistant
-  const anthMessages = messages
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => ({ role: m.role, content: m.content }));
+  const anthMessages = messages.filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content }));
 
   const upstream = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: {
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      stream: true,
-      system: SYSTEM,
-      messages: anthMessages,
-    }),
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+    body: JSON.stringify({ model, max_tokens: 4096, stream: true, system: SYSTEM, messages: anthMessages }),
   });
 
   if (!upstream.ok) {
     const t = await upstream.text();
     console.error("anthropic error", upstream.status, t);
-    if (upstream.status === 429) return json({ error: "Rate limited" }, 429);
-    if (upstream.status === 401) return json({ error: "Anthropic auth failed" }, 500);
-    return json({ error: "Anthropic error" }, 500);
+    if (upstream.status === 429) return j({ error: "Rate limited" }, 429);
+    if (upstream.status === 401) return j({ error: "Anthropic auth failed" }, 500);
+    return j({ error: "Anthropic error" }, 500);
   }
 
-  // Translate Anthropic SSE → OpenAI delta SSE
   const reader = upstream.body!.getReader();
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
@@ -141,10 +133,8 @@ async function streamAnthropic(messages: Msg[], model: string) {
             if (!payload) continue;
             try {
               const ev = JSON.parse(payload);
-              if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
-                send(ev.delta.text);
-              }
-            } catch { /* ignore partial */ }
+              if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") send(ev.delta.text);
+            } catch { /* ignore */ }
           }
         }
       } catch (e) {
@@ -157,6 +147,6 @@ async function streamAnthropic(messages: Msg[], model: string) {
   });
 
   return new Response(stream, {
-    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", ...cors },
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", ...cors, ...extra },
   });
 }

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { ArrowUp, LogOut, Sparkles, Terminal } from "lucide-react";
+import { ArrowUp, LogOut, Sparkles, Terminal, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
@@ -23,6 +23,7 @@ function AppPage() {
   const { user, loading, signOut } = useAuth();
   const nav = useNavigate();
   const [tier, setTier] = useState<Tier>("free");
+  const [credits, setCredits] = useState<number | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -31,10 +32,17 @@ function AppPage() {
 
   useEffect(() => { if (!loading && !user) nav({ to: "/login" }); }, [user, loading, nav]);
 
+  const refreshCredits = async (uid: string) => {
+    await supabase.rpc("ensure_credits", { _user_id: uid });
+    const { data } = await supabase.from("credits").select("balance").eq("user_id", uid).maybeSingle();
+    if (typeof data?.balance === "number") setCredits(data.balance);
+  };
+
   useEffect(() => {
     if (!user) return;
     supabase.from("subscriptions").select("tier").eq("user_id", user.id).maybeSingle()
       .then(({ data }) => { if (data?.tier) setTier(data.tier as Tier); });
+    refreshCredits(user.id);
   }, [user]);
 
   useEffect(() => {
@@ -70,13 +78,18 @@ function AppPage() {
       const resp = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
-        body: JSON.stringify({ messages: next, tier }),
+        body: JSON.stringify({ messages: next }),
       });
 
+      const remaining = resp.headers.get("X-Credits-Remaining");
+      if (remaining) setCredits(Number(remaining));
+
       if (!resp.ok) {
-        if (resp.status === 429) toast.error("Rate limited. Try again in a moment.");
-        else if (resp.status === 402) toast.error("AI credits exhausted. Upgrade or add credits.");
-        else toast.error(`Error ${resp.status}`);
+        let msg = `Error ${resp.status}`;
+        try { const e = await resp.json(); if (e.error) msg = e.error; } catch { /* ignore */ }
+        if (resp.status === 402) toast.error(msg);
+        else if (resp.status === 429) toast.error("Rate limited. Try again in a moment.");
+        else toast.error(msg);
         setStreaming(false);
         return;
       }
@@ -129,6 +142,12 @@ function AppPage() {
             <span>razen<span className="text-primary">/</span>ai</span>
           </Link>
           <div className="flex items-center gap-2">
+            {credits !== null && (
+              <span className="flex items-center gap-1 rounded-sm border border-border/60 bg-muted/30 px-2 py-0.5 font-mono text-[10px] text-muted-foreground" title="Credits remaining">
+                <Zap className="h-3 w-3 text-primary" />
+                <span className="text-foreground">{credits.toLocaleString()}</span>
+              </span>
+            )}
             <span className="rounded-sm border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">{tier}</span>
             {tier === "free" && (
               <Link to="/pricing"><Button size="sm" variant="ghost" className="h-8 font-mono text-xs"><Sparkles className="mr-1 h-3 w-3" />upgrade</Button></Link>

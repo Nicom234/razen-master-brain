@@ -21,18 +21,18 @@ export const Route = createFileRoute("/pricing")({
 
 const tiers = [
   {
-    id: "free", name: "Free", price: "£0", period: "/forever",
-    features: ["Master Brain (Gemini 3 Flash)", "50 messages / month", "Web search", "Markdown + code blocks"],
+    id: "free", priceId: null, name: "Free", price: "£0", period: "/forever",
+    features: ["Master Brain (Gemini 2.5 Flash)", "25 credits / day", "Markdown + code blocks", "Conversation history"],
     cta: "Start free", highlight: false,
   },
   {
-    id: "pro", name: "Pro", price: "£29.99", period: "/month",
-    features: ["Claude Sonnet 3.5 backend", "Unlimited messages", "Code execution sandbox", "Priority routing", "Conversation history"],
+    id: "pro", priceId: "razen_pro_monthly", name: "Pro", price: "£29.99", period: "/month",
+    features: ["Claude Sonnet 3.5 backend", "2,500 credits / month", "Priority routing", "Code execution"],
     cta: "Upgrade to Pro", highlight: true,
   },
   {
-    id: "elite", name: "Elite", price: "£99.99", period: "/month",
-    features: ["Claude Sonnet 4.5 backend", "Everything in Pro", "Long-horizon agent loops", "200k context window", "Priority support"],
+    id: "elite", priceId: "razen_elite_monthly", name: "Elite", price: "£99.99", period: "/month",
+    features: ["Claude Sonnet 4.5 backend", "8,500 credits / month", "Long-horizon agent loops", "200k context window"],
     cta: "Go Elite", highlight: false,
   },
 ];
@@ -42,7 +42,7 @@ function PricingPage() {
   const nav = useNavigate();
   const [loading, setLoading] = useState<string | null>(null);
 
-  const upgrade = async (plan: "pro" | "elite") => {
+  const upgrade = async (plan: "pro" | "elite", priceId: string) => {
     if (!user) { nav({ to: "/signup" }); return; }
     setLoading(plan);
     try {
@@ -50,7 +50,7 @@ function PricingPage() {
       const res = await fetch("/api/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ priceId }),
       });
       const j = await res.json();
       if (!res.ok || !j.url) throw new Error(j.error || "Checkout failed");
@@ -90,7 +90,7 @@ function PricingPage() {
                 {t.id === "free" ? (
                   <Link to={user ? "/app" : "/signup"} className="block"><Button variant={t.highlight ? "default" : "outline"} className="w-full font-mono">{user ? "open_app" : t.cta}</Button></Link>
                 ) : (
-                  <Button onClick={() => upgrade(t.id as "pro" | "elite")} disabled={loading === t.id} variant={t.highlight ? "default" : "outline"} className="w-full font-mono">
+                  <Button onClick={() => upgrade(t.id as "pro" | "elite", t.priceId!)} disabled={loading === t.id} variant={t.highlight ? "default" : "outline"} className="w-full font-mono">
                     {loading === t.id ? "loading…" : t.cta}
                   </Button>
                 )}

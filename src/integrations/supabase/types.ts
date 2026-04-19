@@ -38,6 +38,30 @@ export type Database = {
         }
         Relationships: []
       }
+      credits: {
+        Row: {
+          balance: number
+          last_daily_grant: string
+          monthly_grant: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          last_daily_grant?: string
+          monthly_grant?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          last_daily_grant?: string
+          monthly_grant?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
@@ -165,6 +189,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      deduct_credit: { Args: { _user_id: string }; Returns: number }
+      ensure_credits: { Args: { _user_id: string }; Returns: number }
+      grant_subscription_credits: {
+        Args: {
+          _tier: Database["public"]["Enums"]["subscription_tier"]
+          _user_id: string
+        }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
