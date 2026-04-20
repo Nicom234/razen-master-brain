@@ -37,6 +37,8 @@ function AppPage() {
   const nav = useNavigate();
   const [tier, setTier] = useState<Tier>("free");
   const [credits, setCredits] = useState<number | null>(null);
+  const [monthlyGrant, setMonthlyGrant] = useState<number>(25);
+  const [stats, setStats] = useState<{ chats: number; messages: number; memories: number }>({ chats: 0, messages: 0, memories: 0 });
   const [lastModel, setLastModel] = useState<string | null>(null);
   const [lastCost, setLastCost] = useState<number | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -56,16 +58,20 @@ function AppPage() {
   const estimatedCost = (() => {
     const heavy = input.length > 1200 || mode === "build" || mode === "plan";
     if (tier === "elite") {
-      if (mode === "build" || mode === "plan") return 6;
-      if (mode === "write") return 4;
-      return heavy ? 3 : 2;
+      if (mode === "build") return heavy ? 18 : 12;
+      if (mode === "plan") return heavy ? 14 : 10;
+      if (mode === "write") return heavy ? 10 : 7;
+      return heavy ? 5 : 3;
     }
     if (tier === "pro") {
-      if (mode === "build") return 3;
-      if (mode === "write" || mode === "plan") return 2;
-      return heavy ? 2 : 1;
+      if (mode === "build") return heavy ? 10 : 7;
+      if (mode === "plan") return heavy ? 8 : 6;
+      if (mode === "write") return heavy ? 6 : 4;
+      return heavy ? 3 : 2;
     }
-    return 1;
+    if (mode === "build" || mode === "plan") return 3;
+    if (mode === "write") return 2;
+    return heavy ? 2 : 1;
   })();
 
   const modelLabel = (id: string | null) => {
@@ -93,13 +99,23 @@ function AppPage() {
 
   const refreshCredits = async (uid: string) => {
     await supabase.rpc("ensure_credits", { _user_id: uid });
-    const { data } = await supabase.from("credits").select("balance").eq("user_id", uid).maybeSingle();
+    const { data } = await supabase.from("credits").select("balance,monthly_grant").eq("user_id", uid).maybeSingle();
     if (typeof data?.balance === "number") setCredits(data.balance);
+    if (typeof data?.monthly_grant === "number") setMonthlyGrant(data.monthly_grant);
   };
 
   const loadConvs = async (uid: string) => {
     const { data } = await supabase.from("conversations").select("id,title,updated_at").eq("user_id", uid).order("updated_at", { ascending: false }).limit(50);
     if (data) setConvs(data);
+  };
+
+  const loadStats = async (uid: string) => {
+    const [chats, msgs, mems] = await Promise.all([
+      supabase.from("conversations").select("id", { count: "exact", head: true }).eq("user_id", uid),
+      supabase.from("messages").select("id", { count: "exact", head: true }).eq("user_id", uid).eq("role", "user"),
+      supabase.from("memories").select("id", { count: "exact", head: true }).eq("user_id", uid),
+    ]);
+    setStats({ chats: chats.count ?? 0, messages: msgs.count ?? 0, memories: mems.count ?? 0 });
   };
 
   useEffect(() => {
@@ -108,6 +124,7 @@ function AppPage() {
       .then(({ data }) => { if (data?.tier) setTier(data.tier as Tier); });
     refreshCredits(user.id);
     loadConvs(user.id);
+    loadStats(user.id);
   }, [user]);
 
   useEffect(() => {
@@ -389,21 +406,89 @@ function AppPage() {
         </header>
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-3xl px-4 py-10 md:px-6">
-            {messages.length === 0 ? (
-              <div className="py-16 text-center">
-                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-foreground text-background">
-                  <ModeIcon className="h-6 w-6" />
+          <div className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-10">
+            {messages.length === 0 && !convId ? (
+              <div className="space-y-10">
+                {/* Greeting */}
+                <div>
+                  <h1 className="font-display text-4xl md:text-6xl tracking-tight">
+                    {greetingFor(new Date())}{user.email ? `, ${user.email.split("@")[0]}` : ""}.
+                  </h1>
+                  <p className="mt-3 text-lg text-muted-foreground">What are we shipping today?</p>
                 </div>
-                <h2 className="mt-6 font-display text-4xl md:text-5xl">{MODES.find((m) => m.id === mode)?.label} mode.</h2>
-                <p className="mt-3 text-muted-foreground">{MODES.find((m) => m.id === mode)?.hint}</p>
-                <div className="mt-10 grid gap-3 text-left sm:grid-cols-2">
-                  {modePrompts(mode).map((p) => (
-                    <button key={p} onClick={() => setInput(p)} className="rounded-xl border border-border/70 bg-card/60 p-4 text-sm text-foreground/80 transition hover:bg-card hover:shadow-soft">
-                      {p}
-                    </button>
-                  ))}
+
+                {/* Stats strip */}
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <StatCard label="Credits left" value={credits?.toLocaleString() ?? "—"} sub={`of ${monthlyGrant.toLocaleString()} ${tier === "free" ? "today" : "this month"}`} icon={Zap} />
+                  <StatCard label="Conversations" value={stats.chats.toLocaleString()} sub="lifetime" icon={MessageSquare} />
+                  <StatCard label="Messages sent" value={stats.messages.toLocaleString()} sub="lifetime" icon={ArrowUp} />
+                  <StatCard label="Memories" value={stats.memories.toLocaleString()} sub={tier === "elite" ? "active" : "Elite feature"} icon={Brain} />
                 </div>
+
+                {/* Mode launcher */}
+                <div>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Launch a task</p>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {MODES.map((m) => {
+                      const Active = m.icon;
+                      const selected = mode === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => setMode(m.id)}
+                          className={`group rounded-2xl border p-5 text-left transition ${selected ? "border-primary bg-primary/5 shadow-card" : "border-border/70 bg-card/60 hover:border-border hover:bg-card hover:shadow-soft"}`}
+                        >
+                          <div className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "bg-primary text-primary-foreground" : "bg-foreground text-background"}`}>
+                            <Active className="h-5 w-5" />
+                          </div>
+                          <div className="mt-4 font-display text-xl">{m.label}</div>
+                          <p className="mt-1 text-sm text-muted-foreground">{m.hint}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Suggested prompts */}
+                <div>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Try a {MODES.find((m) => m.id === mode)?.label.toLowerCase()} prompt</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {modePrompts(mode).map((p) => (
+                      <button key={p} onClick={() => setInput(p)} className="rounded-xl border border-border/70 bg-card/60 p-4 text-left text-sm text-foreground/80 transition hover:bg-card hover:shadow-soft">
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent chats */}
+                {convs.length > 0 && (
+                  <div>
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Pick up where you left off</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {convs.slice(0, 6).map((c) => (
+                        <button key={c.id} onClick={() => openConv(c.id)} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-4 py-3 text-left text-sm transition hover:bg-card hover:shadow-soft">
+                          <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <span className="flex-1 truncate">{c.title}</span>
+                          <span className="text-xs text-muted-foreground">{relTime(c.updated_at)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {tier === "free" && (
+                  <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 to-transparent p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"><Sparkles className="h-5 w-5" /></div>
+                      <div className="flex-1">
+                        <div className="font-display text-xl">Unlock Claude Sonnet 4.5</div>
+                        <p className="mt-1 text-sm text-muted-foreground">Pro adds Claude Haiku, file uploads & 400 credits/mo. Elite unlocks Sonnet 4.5 — the best writing & strategy model on Earth — plus long-term memory.</p>
+                      </div>
+                      <Link to="/pricing"><Button className="shrink-0">See plans</Button></Link>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-6">
@@ -502,4 +587,36 @@ function modePrompts(mode: Mode): string[] {
     case "plan": return ["Plan a 30-day launch for a new SaaS pricing page.", "Break a website redesign into a 2-week sprint."];
     case "build": return ["Write a TypeScript Zod schema for a Stripe webhook.", "Debug a flaky React useEffect race condition."];
   }
+}
+
+function greetingFor(d: Date) {
+  const h = d.getHours();
+  if (h < 5) return "Still up";
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function relTime(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  return `${d}d`;
+}
+
+function StatCard({ label, value, sub, icon: Icon }: { label: string; value: string; sub: string; icon: typeof Brain }) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-card/50 p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+      </div>
+      <div className="mt-2 font-display text-3xl">{value}</div>
+      <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>
+    </div>
+  );
 }

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Check, X } from "lucide-react";
+import { Check } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/pricing")({
   head: () => ({
     meta: [
       { title: "Pricing — Razen" },
-      { name: "description", content: "Free forever — 25 messages a day. Pro £29.99/mo. Elite £99.99/mo. Cancel anytime." },
+      { name: "description", content: "Free forever. Pro £29.99/mo. Elite £99.99/mo. Cancel anytime." },
       { property: "og:title", content: "Pricing — Razen" },
     ],
   }),
@@ -24,21 +24,39 @@ const tiers = [
   {
     id: "free", priceId: null, name: "Free", price: "£0", period: "forever",
     tagline: "Try the brain.",
-    features: ["Powered by Gemini Flash Lite", "25 credits every day, forever", "All four modes", "Conversation history", "Web research with citations"],
-    excludes: ["Document upload", "Long-term memory", "Claude Sonnet for craft work"],
+    features: [
+      "25 credits, refilled every day",
+      "All four modes — Research · Write · Plan · Build",
+      "Powered by Gemini Flash",
+      "Live web search with citations",
+      "Conversation history",
+    ],
     cta: "Start free", highlight: false,
   },
   {
     id: "pro", priceId: "razen_pro_monthly", name: "Pro", price: "£29.99", period: "/month",
     tagline: "For daily work.",
-    features: ["Gemini 2.5 Flash + Claude Haiku auto-routing", "2,500 credits / month", "Document & image upload (PDFs, screenshots)", "Long-term memory (lighter)", "Web research with citations", "Markdown export", "Email support"],
-    excludes: ["Claude Sonnet 4.5 for deep work"],
+    features: [
+      "Everything in Free, plus:",
+      "400 credits / month",
+      "Claude Haiku 4.5 for writing, planning & code",
+      "Document & image upload (PDFs, screenshots)",
+      "Markdown export of any chat",
+      "Email support",
+    ],
     cta: "Upgrade to Pro", highlight: true,
   },
   {
     id: "elite", priceId: "razen_elite_monthly", name: "Elite", price: "£99.99", period: "/month",
     tagline: "Your AI chief of staff.",
-    features: ["Everything in Pro", "8,500 credits / month", "Claude Sonnet 4.5 for write, plan & build", "Full long-term memory across every chat", "Smart routing — best model per task", "Markdown export", "Direct founder Slack"],
+    features: [
+      "Everything in Pro, plus:",
+      "1,500 credits / month",
+      "Claude Sonnet 4.5 — the best model on Earth for writing & strategy",
+      "Long-term memory across every chat",
+      "Smart routing — top-tier model per task",
+      "Direct founder Slack",
+    ],
     cta: "Go Elite", highlight: false,
   },
 ];
@@ -131,18 +149,15 @@ function PricingPage() {
                 <span className="text-sm text-muted-foreground">{t.period}</span>
               </div>
               <ul className="mt-7 flex-1 space-y-3 text-sm">
-                {t.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <span className="text-foreground/85">{f}</span>
-                  </li>
-                ))}
-                {t.excludes?.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 opacity-50">
-                    <X className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span className="text-foreground/70">{f}</span>
-                  </li>
-                ))}
+                {t.features.map((f) => {
+                  const isHeading = f.startsWith("Everything in");
+                  return (
+                    <li key={f} className={isHeading ? "pt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground" : "flex items-start gap-2.5"}>
+                      {!isHeading && <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
+                      <span className={isHeading ? "" : "text-foreground/85"}>{f}</span>
+                    </li>
+                  );
+                })}
               </ul>
               <div className="mt-8">
                 {t.id === "free" ? (
@@ -170,18 +185,18 @@ function PricingPage() {
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl border border-border/60 bg-background/60 p-4">
               <div className="text-xs uppercase tracking-wider text-muted-foreground">Quick</div>
-              <div className="mt-1 font-display text-3xl">1–2 <span className="text-base text-muted-foreground">credits</span></div>
+              <div className="mt-1 font-display text-3xl">1–3 <span className="text-base text-muted-foreground">credits</span></div>
               <div className="mt-1 text-xs text-muted-foreground">Research, lookups, short Q&amp;A · Gemini Flash</div>
             </div>
             <div className="rounded-xl border border-border/60 bg-background/60 p-4">
               <div className="text-xs uppercase tracking-wider text-muted-foreground">Smart</div>
-              <div className="mt-1 font-display text-3xl">2–4 <span className="text-base text-muted-foreground">credits</span></div>
-              <div className="mt-1 text-xs text-muted-foreground">Writing, planning, longer threads · Claude Haiku/Sonnet</div>
+              <div className="mt-1 font-display text-3xl">4–10 <span className="text-base text-muted-foreground">credits</span></div>
+              <div className="mt-1 text-xs text-muted-foreground">Writing, planning, longer threads · Claude Haiku</div>
             </div>
             <div className="rounded-xl border border-border/60 bg-background/60 p-4">
               <div className="text-xs uppercase tracking-wider text-muted-foreground">Heavy</div>
-              <div className="mt-1 font-display text-3xl">6 <span className="text-base text-muted-foreground">credits</span></div>
-              <div className="mt-1 text-xs text-muted-foreground">Build &amp; plan on Elite · Claude Sonnet 4.5 deep work</div>
+              <div className="mt-1 font-display text-3xl">10–18 <span className="text-base text-muted-foreground">credits</span></div>
+              <div className="mt-1 text-xs text-muted-foreground">Build &amp; plan on Elite · Claude Sonnet 4.5</div>
             </div>
           </div>
         </div>

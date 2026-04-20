@@ -30,17 +30,21 @@ function route(tier: Tier, mode: Mode, msgChars: number): Routed {
   const heavy = msgChars > 1200 || mode === "build" || mode === "plan";
 
   if (tier === "elite") {
-    if (mode === "build" || mode === "plan") return { provider: "anthropic", model: "claude-sonnet-4-5", cost: 6 };
-    if (mode === "write") return { provider: "anthropic", model: "claude-sonnet-4-5", cost: 4 };
-    return { provider: "lovable", model: "google/gemini-2.5-flash", cost: heavy ? 3 : 2 }; // research with grounding
+    if (mode === "build") return { provider: "anthropic", model: "claude-sonnet-4-5", cost: heavy ? 18 : 12 };
+    if (mode === "plan") return { provider: "anthropic", model: "claude-sonnet-4-5", cost: heavy ? 14 : 10 };
+    if (mode === "write") return { provider: "anthropic", model: "claude-sonnet-4-5", cost: heavy ? 10 : 7 };
+    return { provider: "lovable", model: "google/gemini-2.5-flash", cost: heavy ? 5 : 3 }; // research
   }
   if (tier === "pro") {
-    if (mode === "build") return { provider: "anthropic", model: "claude-haiku-4-5", cost: 3 };
-    if (mode === "write" || mode === "plan") return { provider: "anthropic", model: "claude-haiku-4-5", cost: 2 };
-    return { provider: "lovable", model: "google/gemini-2.5-flash", cost: heavy ? 2 : 1 };
+    if (mode === "build") return { provider: "anthropic", model: "claude-haiku-4-5", cost: heavy ? 10 : 7 };
+    if (mode === "plan") return { provider: "anthropic", model: "claude-haiku-4-5", cost: heavy ? 8 : 6 };
+    if (mode === "write") return { provider: "anthropic", model: "claude-haiku-4-5", cost: heavy ? 6 : 4 };
+    return { provider: "lovable", model: "google/gemini-2.5-flash", cost: heavy ? 3 : 2 };
   }
-  // free
-  return { provider: "lovable", model: "google/gemini-2.5-flash-lite", cost: 1 };
+  // free — light Gemini, simple flat costs
+  if (mode === "build" || mode === "plan") return { provider: "lovable", model: "google/gemini-2.5-flash", cost: 3 };
+  if (mode === "write") return { provider: "lovable", model: "google/gemini-2.5-flash", cost: 2 };
+  return { provider: "lovable", model: "google/gemini-2.5-flash-lite", cost: heavy ? 2 : 1 };
 }
 
 serve(async (req) => {
