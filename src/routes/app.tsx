@@ -588,3 +588,35 @@ function modePrompts(mode: Mode): string[] {
     case "build": return ["Write a TypeScript Zod schema for a Stripe webhook.", "Debug a flaky React useEffect race condition."];
   }
 }
+
+function greetingFor(d: Date) {
+  const h = d.getHours();
+  if (h < 5) return "Still up";
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function relTime(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  return `${d}d`;
+}
+
+function StatCard({ label, value, sub, icon: Icon }: { label: string; value: string; sub: string; icon: typeof Brain }) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-card/50 p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+      </div>
+      <div className="mt-2 font-display text-3xl">{value}</div>
+      <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>
+    </div>
+  );
+}
