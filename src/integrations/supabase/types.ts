@@ -216,7 +216,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      deduct_credit: { Args: { _user_id: string }; Returns: number }
+      deduct_credit:
+        | { Args: { _user_id: string }; Returns: number }
+        | { Args: { _cost?: number; _user_id: string }; Returns: number }
       ensure_credits: { Args: { _user_id: string }; Returns: number }
       grant_subscription_credits: {
         Args: {
