@@ -37,6 +37,8 @@ function AppPage() {
   const nav = useNavigate();
   const [tier, setTier] = useState<Tier>("free");
   const [credits, setCredits] = useState<number | null>(null);
+  const [monthlyGrant, setMonthlyGrant] = useState<number>(25);
+  const [stats, setStats] = useState<{ chats: number; messages: number; memories: number }>({ chats: 0, messages: 0, memories: 0 });
   const [lastModel, setLastModel] = useState<string | null>(null);
   const [lastCost, setLastCost] = useState<number | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -97,13 +99,23 @@ function AppPage() {
 
   const refreshCredits = async (uid: string) => {
     await supabase.rpc("ensure_credits", { _user_id: uid });
-    const { data } = await supabase.from("credits").select("balance").eq("user_id", uid).maybeSingle();
+    const { data } = await supabase.from("credits").select("balance,monthly_grant").eq("user_id", uid).maybeSingle();
     if (typeof data?.balance === "number") setCredits(data.balance);
+    if (typeof data?.monthly_grant === "number") setMonthlyGrant(data.monthly_grant);
   };
 
   const loadConvs = async (uid: string) => {
     const { data } = await supabase.from("conversations").select("id,title,updated_at").eq("user_id", uid).order("updated_at", { ascending: false }).limit(50);
     if (data) setConvs(data);
+  };
+
+  const loadStats = async (uid: string) => {
+    const [chats, msgs, mems] = await Promise.all([
+      supabase.from("conversations").select("id", { count: "exact", head: true }).eq("user_id", uid),
+      supabase.from("messages").select("id", { count: "exact", head: true }).eq("user_id", uid).eq("role", "user"),
+      supabase.from("memories").select("id", { count: "exact", head: true }).eq("user_id", uid),
+    ]);
+    setStats({ chats: chats.count ?? 0, messages: msgs.count ?? 0, memories: mems.count ?? 0 });
   };
 
   useEffect(() => {
@@ -112,6 +124,7 @@ function AppPage() {
       .then(({ data }) => { if (data?.tier) setTier(data.tier as Tier); });
     refreshCredits(user.id);
     loadConvs(user.id);
+    loadStats(user.id);
   }, [user]);
 
   useEffect(() => {
