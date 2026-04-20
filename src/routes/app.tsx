@@ -225,6 +225,10 @@ function AppPage() {
 
       const remaining = resp.headers.get("X-Credits-Remaining");
       if (remaining) setCredits(Number(remaining));
+      const usedModel = resp.headers.get("X-Model");
+      if (usedModel) setLastModel(usedModel);
+      const usedCost = resp.headers.get("X-Cost");
+      if (usedCost) setLastCost(Number(usedCost));
 
       if (!resp.ok) {
         let msg = `Error ${resp.status}`;
