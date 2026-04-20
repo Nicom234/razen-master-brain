@@ -37,6 +37,8 @@ function AppPage() {
   const nav = useNavigate();
   const [tier, setTier] = useState<Tier>("free");
   const [credits, setCredits] = useState<number | null>(null);
+  const [lastModel, setLastModel] = useState<string | null>(null);
+  const [lastCost, setLastCost] = useState<number | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -49,6 +51,31 @@ function AppPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const search = Route.useSearch() as { upgraded?: string };
+
+  // Estimated cost preview (mirrors edge `route()` heuristics).
+  const estimatedCost = (() => {
+    const heavy = input.length > 1200 || mode === "build" || mode === "plan";
+    if (tier === "elite") {
+      if (mode === "build" || mode === "plan") return 6;
+      if (mode === "write") return 4;
+      return heavy ? 3 : 2;
+    }
+    if (tier === "pro") {
+      if (mode === "build") return 3;
+      if (mode === "write" || mode === "plan") return 2;
+      return heavy ? 2 : 1;
+    }
+    return 1;
+  })();
+
+  const modelLabel = (id: string | null) => {
+    if (!id) return "";
+    if (id.startsWith("claude-sonnet")) return "Claude Sonnet 4.5";
+    if (id.startsWith("claude-haiku")) return "Claude Haiku 4.5";
+    if (id.includes("flash-lite")) return "Gemini Flash Lite";
+    if (id.includes("flash")) return "Gemini Flash";
+    return id;
+  };
 
   const exportChat = () => {
     if (messages.length === 0) { toast.error("Nothing to export yet."); return; }
