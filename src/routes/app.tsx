@@ -56,16 +56,20 @@ function AppPage() {
   const estimatedCost = (() => {
     const heavy = input.length > 1200 || mode === "build" || mode === "plan";
     if (tier === "elite") {
-      if (mode === "build" || mode === "plan") return 6;
-      if (mode === "write") return 4;
-      return heavy ? 3 : 2;
+      if (mode === "build") return heavy ? 18 : 12;
+      if (mode === "plan") return heavy ? 14 : 10;
+      if (mode === "write") return heavy ? 10 : 7;
+      return heavy ? 5 : 3;
     }
     if (tier === "pro") {
-      if (mode === "build") return 3;
-      if (mode === "write" || mode === "plan") return 2;
-      return heavy ? 2 : 1;
+      if (mode === "build") return heavy ? 10 : 7;
+      if (mode === "plan") return heavy ? 8 : 6;
+      if (mode === "write") return heavy ? 6 : 4;
+      return heavy ? 3 : 2;
     }
-    return 1;
+    if (mode === "build" || mode === "plan") return 3;
+    if (mode === "write") return 2;
+    return heavy ? 2 : 1;
   })();
 
   const modelLabel = (id: string | null) => {
