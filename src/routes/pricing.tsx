@@ -164,6 +164,28 @@ function PricingPage() {
           ))}
         </div>
 
+        <div className="mx-auto mt-16 max-w-3xl rounded-2xl border border-border/70 bg-card/60 p-8 shadow-soft">
+          <h3 className="font-display text-2xl">How credits work</h3>
+          <p className="mt-2 text-sm text-muted-foreground">Razen routes each task to the best model for the job. Costs scale with the work, not the message count — so quick lookups stay cheap and deep work gets the firepower it deserves.</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-border/60 bg-background/60 p-4">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Quick</div>
+              <div className="mt-1 font-display text-3xl">1–2 <span className="text-base text-muted-foreground">credits</span></div>
+              <div className="mt-1 text-xs text-muted-foreground">Research, lookups, short Q&amp;A · Gemini Flash</div>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/60 p-4">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Smart</div>
+              <div className="mt-1 font-display text-3xl">2–4 <span className="text-base text-muted-foreground">credits</span></div>
+              <div className="mt-1 text-xs text-muted-foreground">Writing, planning, longer threads · Claude Haiku/Sonnet</div>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/60 p-4">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Heavy</div>
+              <div className="mt-1 font-display text-3xl">6 <span className="text-base text-muted-foreground">credits</span></div>
+              <div className="mt-1 text-xs text-muted-foreground">Build &amp; plan on Elite · Claude Sonnet 4.5 deep work</div>
+            </div>
+          </div>
+        </div>
+
         <p className="mt-10 text-center text-sm text-muted-foreground">
           Cancel anytime. Prices in GBP. VAT may apply.
         </p>
