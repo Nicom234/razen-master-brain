@@ -474,8 +474,19 @@ function AppPage() {
                 </Button>
               </div>
             </div>
-            <p className="mt-2 text-center text-xs text-muted-foreground">
-              {credits !== null ? `${credits.toLocaleString()} credits left · ` : ""}Razen can make mistakes. Verify important info.
+            <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-xs text-muted-foreground">
+              {credits !== null && <span>{credits.toLocaleString()} credits left</span>}
+              <span className="hidden sm:inline opacity-50">·</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary/60" />
+                This task: <strong className="text-foreground/80">{estimatedCost} {estimatedCost === 1 ? "credit" : "credits"}</strong>
+              </span>
+              {lastModel && (
+                <>
+                  <span className="hidden sm:inline opacity-50">·</span>
+                  <span>Last reply: {modelLabel(lastModel)}{lastCost ? ` (${lastCost})` : ""}</span>
+                </>
+              )}
             </p>
           </div>
         </div>
