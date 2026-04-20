@@ -185,18 +185,18 @@ function PricingPage() {
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl border border-border/60 bg-background/60 p-4">
               <div className="text-xs uppercase tracking-wider text-muted-foreground">Quick</div>
-              <div className="mt-1 font-display text-3xl">1–2 <span className="text-base text-muted-foreground">credits</span></div>
+              <div className="mt-1 font-display text-3xl">1–3 <span className="text-base text-muted-foreground">credits</span></div>
               <div className="mt-1 text-xs text-muted-foreground">Research, lookups, short Q&amp;A · Gemini Flash</div>
             </div>
             <div className="rounded-xl border border-border/60 bg-background/60 p-4">
               <div className="text-xs uppercase tracking-wider text-muted-foreground">Smart</div>
-              <div className="mt-1 font-display text-3xl">2–4 <span className="text-base text-muted-foreground">credits</span></div>
-              <div className="mt-1 text-xs text-muted-foreground">Writing, planning, longer threads · Claude Haiku/Sonnet</div>
+              <div className="mt-1 font-display text-3xl">4–10 <span className="text-base text-muted-foreground">credits</span></div>
+              <div className="mt-1 text-xs text-muted-foreground">Writing, planning, longer threads · Claude Haiku</div>
             </div>
             <div className="rounded-xl border border-border/60 bg-background/60 p-4">
               <div className="text-xs uppercase tracking-wider text-muted-foreground">Heavy</div>
-              <div className="mt-1 font-display text-3xl">6 <span className="text-base text-muted-foreground">credits</span></div>
-              <div className="mt-1 text-xs text-muted-foreground">Build &amp; plan on Elite · Claude Sonnet 4.5 deep work</div>
+              <div className="mt-1 font-display text-3xl">10–18 <span className="text-base text-muted-foreground">credits</span></div>
+              <div className="mt-1 text-xs text-muted-foreground">Build &amp; plan on Elite · Claude Sonnet 4.5</div>
             </div>
           </div>
         </div>
