@@ -406,21 +406,89 @@ function AppPage() {
         </header>
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-3xl px-4 py-10 md:px-6">
-            {messages.length === 0 ? (
-              <div className="py-16 text-center">
-                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-foreground text-background">
-                  <ModeIcon className="h-6 w-6" />
+          <div className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-10">
+            {messages.length === 0 && !convId ? (
+              <div className="space-y-10">
+                {/* Greeting */}
+                <div>
+                  <h1 className="font-display text-4xl md:text-6xl tracking-tight">
+                    {greetingFor(new Date())}{user.email ? `, ${user.email.split("@")[0]}` : ""}.
+                  </h1>
+                  <p className="mt-3 text-lg text-muted-foreground">What are we shipping today?</p>
                 </div>
-                <h2 className="mt-6 font-display text-4xl md:text-5xl">{MODES.find((m) => m.id === mode)?.label} mode.</h2>
-                <p className="mt-3 text-muted-foreground">{MODES.find((m) => m.id === mode)?.hint}</p>
-                <div className="mt-10 grid gap-3 text-left sm:grid-cols-2">
-                  {modePrompts(mode).map((p) => (
-                    <button key={p} onClick={() => setInput(p)} className="rounded-xl border border-border/70 bg-card/60 p-4 text-sm text-foreground/80 transition hover:bg-card hover:shadow-soft">
-                      {p}
-                    </button>
-                  ))}
+
+                {/* Stats strip */}
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <StatCard label="Credits left" value={credits?.toLocaleString() ?? "—"} sub={`of ${monthlyGrant.toLocaleString()} ${tier === "free" ? "today" : "this month"}`} icon={Zap} />
+                  <StatCard label="Conversations" value={stats.chats.toLocaleString()} sub="lifetime" icon={MessageSquare} />
+                  <StatCard label="Messages sent" value={stats.messages.toLocaleString()} sub="lifetime" icon={ArrowUp} />
+                  <StatCard label="Memories" value={stats.memories.toLocaleString()} sub={tier === "elite" ? "active" : "Elite feature"} icon={Brain} />
                 </div>
+
+                {/* Mode launcher */}
+                <div>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Launch a task</p>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {MODES.map((m) => {
+                      const Active = m.icon;
+                      const selected = mode === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => setMode(m.id)}
+                          className={`group rounded-2xl border p-5 text-left transition ${selected ? "border-primary bg-primary/5 shadow-card" : "border-border/70 bg-card/60 hover:border-border hover:bg-card hover:shadow-soft"}`}
+                        >
+                          <div className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "bg-primary text-primary-foreground" : "bg-foreground text-background"}`}>
+                            <Active className="h-5 w-5" />
+                          </div>
+                          <div className="mt-4 font-display text-xl">{m.label}</div>
+                          <p className="mt-1 text-sm text-muted-foreground">{m.hint}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Suggested prompts */}
+                <div>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Try a {MODES.find((m) => m.id === mode)?.label.toLowerCase()} prompt</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {modePrompts(mode).map((p) => (
+                      <button key={p} onClick={() => setInput(p)} className="rounded-xl border border-border/70 bg-card/60 p-4 text-left text-sm text-foreground/80 transition hover:bg-card hover:shadow-soft">
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent chats */}
+                {convs.length > 0 && (
+                  <div>
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Pick up where you left off</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {convs.slice(0, 6).map((c) => (
+                        <button key={c.id} onClick={() => openConv(c.id)} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-4 py-3 text-left text-sm transition hover:bg-card hover:shadow-soft">
+                          <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <span className="flex-1 truncate">{c.title}</span>
+                          <span className="text-xs text-muted-foreground">{relTime(c.updated_at)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {tier === "free" && (
+                  <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 to-transparent p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"><Sparkles className="h-5 w-5" /></div>
+                      <div className="flex-1">
+                        <div className="font-display text-xl">Unlock Claude Sonnet 4.5</div>
+                        <p className="mt-1 text-sm text-muted-foreground">Pro adds Claude Haiku, file uploads & 400 credits/mo. Elite unlocks Sonnet 4.5 — the best writing & strategy model on Earth — plus long-term memory.</p>
+                      </div>
+                      <Link to="/pricing"><Button className="shrink-0">See plans</Button></Link>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-6">
