@@ -24,21 +24,21 @@ const tiers = [
   {
     id: "free", priceId: null, name: "Free", price: "£0", period: "forever",
     tagline: "Try the brain.",
-    features: ["Razen on Gemini Flash", "25 messages every day", "All four modes", "Conversation history", "Web research"],
-    excludes: ["Document upload", "Long-term memory", "Premium models (GPT-5)"],
+    features: ["Powered by Gemini Flash Lite", "25 credits every day, forever", "All four modes", "Conversation history", "Web research with citations"],
+    excludes: ["Document upload", "Long-term memory", "Claude Sonnet for craft work"],
     cta: "Start free", highlight: false,
   },
   {
     id: "pro", priceId: "razen_pro_monthly", name: "Pro", price: "£29.99", period: "/month",
     tagline: "For daily work.",
-    features: ["Gemini 2.5 Pro + GPT-5 mini for code", "2,500 messages / month", "Document & image upload", "Web research with citations", "Markdown export", "Email support"],
-    excludes: ["Long-term memory", "GPT-5 full reasoning"],
+    features: ["Gemini 2.5 Flash + Claude Haiku auto-routing", "2,500 credits / month", "Document & image upload (PDFs, screenshots)", "Long-term memory (lighter)", "Web research with citations", "Markdown export", "Email support"],
+    excludes: ["Claude Sonnet 4.5 for deep work"],
     cta: "Upgrade to Pro", highlight: true,
   },
   {
     id: "elite", priceId: "razen_elite_monthly", name: "Elite", price: "£99.99", period: "/month",
     tagline: "Your AI chief of staff.",
-    features: ["Everything in Pro", "8,500 messages / month", "Long-term memory across every chat", "GPT-5 for build & plan modes", "Premium model auto-routing", "Markdown export", "Direct founder Slack"],
+    features: ["Everything in Pro", "8,500 credits / month", "Claude Sonnet 4.5 for write, plan & build", "Full long-term memory across every chat", "Smart routing — best model per task", "Markdown export", "Direct founder Slack"],
     cta: "Go Elite", highlight: false,
   },
 ];
