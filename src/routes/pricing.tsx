@@ -149,18 +149,15 @@ function PricingPage() {
                 <span className="text-sm text-muted-foreground">{t.period}</span>
               </div>
               <ul className="mt-7 flex-1 space-y-3 text-sm">
-                {t.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <span className="text-foreground/85">{f}</span>
-                  </li>
-                ))}
-                {t.excludes?.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 opacity-50">
-                    <X className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span className="text-foreground/70">{f}</span>
-                  </li>
-                ))}
+                {t.features.map((f) => {
+                  const isHeading = f.startsWith("Everything in");
+                  return (
+                    <li key={f} className={isHeading ? "pt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground" : "flex items-start gap-2.5"}>
+                      {!isHeading && <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
+                      <span className={isHeading ? "" : "text-foreground/85"}>{f}</span>
+                    </li>
+                  );
+                })}
               </ul>
               <div className="mt-8">
                 {t.id === "free" ? (
