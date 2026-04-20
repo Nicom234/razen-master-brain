@@ -24,21 +24,21 @@ const tiers = [
   {
     id: "free", priceId: null, name: "Free", price: "£0", period: "forever",
     tagline: "Try the brain.",
-    features: ["Razen on Gemini Flash", "25 messages every day", "All four modes", "Conversation history", "Web research"],
-    excludes: ["Document upload", "Long-term memory", "Premium models (GPT-5)"],
+    features: ["Powered by Gemini Flash Lite", "25 credits every day, forever", "All four modes", "Conversation history", "Web research with citations"],
+    excludes: ["Document upload", "Long-term memory", "Claude Sonnet for craft work"],
     cta: "Start free", highlight: false,
   },
   {
     id: "pro", priceId: "razen_pro_monthly", name: "Pro", price: "£29.99", period: "/month",
     tagline: "For daily work.",
-    features: ["Gemini 2.5 Pro + GPT-5 mini for code", "2,500 messages / month", "Document & image upload", "Web research with citations", "Markdown export", "Email support"],
-    excludes: ["Long-term memory", "GPT-5 full reasoning"],
+    features: ["Gemini 2.5 Flash + Claude Haiku auto-routing", "2,500 credits / month", "Document & image upload (PDFs, screenshots)", "Long-term memory (lighter)", "Web research with citations", "Markdown export", "Email support"],
+    excludes: ["Claude Sonnet 4.5 for deep work"],
     cta: "Upgrade to Pro", highlight: true,
   },
   {
     id: "elite", priceId: "razen_elite_monthly", name: "Elite", price: "£99.99", period: "/month",
     tagline: "Your AI chief of staff.",
-    features: ["Everything in Pro", "8,500 messages / month", "Long-term memory across every chat", "GPT-5 for build & plan modes", "Premium model auto-routing", "Markdown export", "Direct founder Slack"],
+    features: ["Everything in Pro", "8,500 credits / month", "Claude Sonnet 4.5 for write, plan & build", "Full long-term memory across every chat", "Smart routing — best model per task", "Markdown export", "Direct founder Slack"],
     cta: "Go Elite", highlight: false,
   },
 ];
@@ -162,6 +162,28 @@ function PricingPage() {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="mx-auto mt-16 max-w-3xl rounded-2xl border border-border/70 bg-card/60 p-8 shadow-soft">
+          <h3 className="font-display text-2xl">How credits work</h3>
+          <p className="mt-2 text-sm text-muted-foreground">Razen routes each task to the best model for the job. Costs scale with the work, not the message count — so quick lookups stay cheap and deep work gets the firepower it deserves.</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-border/60 bg-background/60 p-4">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Quick</div>
+              <div className="mt-1 font-display text-3xl">1–2 <span className="text-base text-muted-foreground">credits</span></div>
+              <div className="mt-1 text-xs text-muted-foreground">Research, lookups, short Q&amp;A · Gemini Flash</div>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/60 p-4">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Smart</div>
+              <div className="mt-1 font-display text-3xl">2–4 <span className="text-base text-muted-foreground">credits</span></div>
+              <div className="mt-1 text-xs text-muted-foreground">Writing, planning, longer threads · Claude Haiku/Sonnet</div>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/60 p-4">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Heavy</div>
+              <div className="mt-1 font-display text-3xl">6 <span className="text-base text-muted-foreground">credits</span></div>
+              <div className="mt-1 text-xs text-muted-foreground">Build &amp; plan on Elite · Claude Sonnet 4.5 deep work</div>
+            </div>
+          </div>
         </div>
 
         <p className="mt-10 text-center text-sm text-muted-foreground">

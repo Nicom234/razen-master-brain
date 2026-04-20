@@ -14,7 +14,7 @@ import { MemoryPanel } from "@/components/MemoryPanel";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Razen" }, { name: "description", content: "Your AI employee." }] }),
-  validateSearch: (s: Record<string, unknown>) => ({ upgraded: typeof s.upgraded === "string" ? s.upgraded : undefined }),
+  validateSearch: (s: Record<string, unknown>): { upgraded?: string } => typeof s.upgraded === "string" ? { upgraded: s.upgraded } : {},
   component: AppPage,
 });
 
@@ -37,6 +37,8 @@ function AppPage() {
   const nav = useNavigate();
   const [tier, setTier] = useState<Tier>("free");
   const [credits, setCredits] = useState<number | null>(null);
+  const [lastModel, setLastModel] = useState<string | null>(null);
+  const [lastCost, setLastCost] = useState<number | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -49,6 +51,31 @@ function AppPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const search = Route.useSearch() as { upgraded?: string };
+
+  // Estimated cost preview (mirrors edge `route()` heuristics).
+  const estimatedCost = (() => {
+    const heavy = input.length > 1200 || mode === "build" || mode === "plan";
+    if (tier === "elite") {
+      if (mode === "build" || mode === "plan") return 6;
+      if (mode === "write") return 4;
+      return heavy ? 3 : 2;
+    }
+    if (tier === "pro") {
+      if (mode === "build") return 3;
+      if (mode === "write" || mode === "plan") return 2;
+      return heavy ? 2 : 1;
+    }
+    return 1;
+  })();
+
+  const modelLabel = (id: string | null) => {
+    if (!id) return "";
+    if (id.startsWith("claude-sonnet")) return "Claude Sonnet 4.5";
+    if (id.startsWith("claude-haiku")) return "Claude Haiku 4.5";
+    if (id.includes("flash-lite")) return "Gemini Flash Lite";
+    if (id.includes("flash")) return "Gemini Flash";
+    return id;
+  };
 
   const exportChat = () => {
     if (messages.length === 0) { toast.error("Nothing to export yet."); return; }
@@ -198,6 +225,10 @@ function AppPage() {
 
       const remaining = resp.headers.get("X-Credits-Remaining");
       if (remaining) setCredits(Number(remaining));
+      const usedModel = resp.headers.get("X-Model");
+      if (usedModel) setLastModel(usedModel);
+      const usedCost = resp.headers.get("X-Cost");
+      if (usedCost) setLastCost(Number(usedCost));
 
       if (!resp.ok) {
         let msg = `Error ${resp.status}`;
@@ -443,8 +474,19 @@ function AppPage() {
                 </Button>
               </div>
             </div>
-            <p className="mt-2 text-center text-xs text-muted-foreground">
-              {credits !== null ? `${credits.toLocaleString()} credits left · ` : ""}Razen can make mistakes. Verify important info.
+            <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-xs text-muted-foreground">
+              {credits !== null && <span>{credits.toLocaleString()} credits left</span>}
+              <span className="hidden sm:inline opacity-50">·</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary/60" />
+                This task: <strong className="text-foreground/80">{estimatedCost} {estimatedCost === 1 ? "credit" : "credits"}</strong>
+              </span>
+              {lastModel && (
+                <>
+                  <span className="hidden sm:inline opacity-50">·</span>
+                  <span>Last reply: {modelLabel(lastModel)}{lastCost ? ` (${lastCost})` : ""}</span>
+                </>
+              )}
             </p>
           </div>
         </div>
