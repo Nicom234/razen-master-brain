@@ -14,7 +14,7 @@ import { MemoryPanel } from "@/components/MemoryPanel";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Razen" }, { name: "description", content: "Your AI employee." }] }),
-  validateSearch: (s: Record<string, unknown>) => ({ upgraded: typeof s.upgraded === "string" ? s.upgraded : undefined }),
+  validateSearch: (s: Record<string, unknown>): { upgraded?: string } => typeof s.upgraded === "string" ? { upgraded: s.upgraded } : {},
   component: AppPage,
 });
 
