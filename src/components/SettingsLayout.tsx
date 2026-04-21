@@ -1,7 +1,8 @@
 import { Link, Outlet, useLocation } from "@tanstack/react-router";
 import { ArrowLeft, User, CreditCard, Palette, Brain, Shield, Bell, Keyboard } from "lucide-react";
 
-const TABS = [
+type Tab = { to: "/settings" | "/settings/billing" | "/settings/appearance" | "/settings/memory" | "/settings/notifications" | "/settings/shortcuts" | "/settings/danger"; label: string; icon: typeof User; exact?: boolean };
+const TABS: Tab[] = [
   { to: "/settings", label: "Account", icon: User, exact: true },
   { to: "/settings/billing", label: "Billing", icon: CreditCard },
   { to: "/settings/appearance", label: "Appearance", icon: Palette },
@@ -9,7 +10,7 @@ const TABS = [
   { to: "/settings/notifications", label: "Notifications", icon: Bell },
   { to: "/settings/shortcuts", label: "Shortcuts", icon: Keyboard },
   { to: "/settings/danger", label: "Danger zone", icon: Shield },
-] as const;
+];
 
 export function SettingsLayout() {
   const loc = useLocation();

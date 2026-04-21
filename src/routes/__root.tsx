@@ -1,6 +1,8 @@
 import { Outlet, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/auth";
+import { ThemeProvider } from "@/lib/theme";
+import { CommandPalette } from "@/components/CommandPalette";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -47,7 +49,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
         <HeadContent />
         <style>{`.font-display { font-family: 'Newsreader', Georgia, serif !important; }`}</style>
       </head>
-      <body><AuthProvider>{children}<Toaster /></AuthProvider><Scripts /></body>
+      <body><ThemeProvider><AuthProvider>{children}<CommandPalette /><Toaster /></AuthProvider></ThemeProvider><Scripts /></body>
     </html>
   );
 }

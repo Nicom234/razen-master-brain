@@ -75,7 +75,7 @@ function HistoryPage() {
           ) : filtered.map((c) => (
             <div key={c.id} className="group flex items-center gap-3 px-4 py-3 transition hover:bg-accent/30">
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              <Link to="/app" search={{ open: c.id }} className="flex-1 truncate text-sm">
+              <Link to="/app" className="flex-1 truncate text-sm">
                 {c.pinned && <Pin className="mr-1.5 inline h-3 w-3 text-primary" />}
                 {c.title}
               </Link>
