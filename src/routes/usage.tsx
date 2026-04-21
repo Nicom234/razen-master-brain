@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, MessageSquare, Brain, Zap, TrendingUp } from "lucide-react";
+import { ArrowLeft, MessageSquare, Brain, Zap } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/usage")({
 function UsagePage() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
-  const [stats, setStats] = useState({ chats: 0, messages: 0, memories: 0, credits: 0, monthly: 0 });
+  const [stats, setStats] = useState({ chats: 0, memories: 0, credits: 0, monthly: 0 });
   const [byDay, setByDay] = useState<{ day: string; n: number }[]>([]);
 
   useEffect(() => { if (!loading && !user) nav({ to: "/login" }); }, [user, loading, nav]);
@@ -21,9 +21,8 @@ function UsagePage() {
     if (!user) return;
     (async () => {
       const since = new Date(Date.now() - 30 * 86400000).toISOString();
-      const [chats, msgs, mems, creditRow, recent] = await Promise.all([
+      const [chats, mems, creditRow, recent] = await Promise.all([
         supabase.from("conversations").select("id", { count: "exact", head: true }).eq("user_id", user.id),
-        supabase.from("messages").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("role", "user"),
         supabase.from("memories").select("id", { count: "exact", head: true }).eq("user_id", user.id),
         supabase.from("credits").select("balance,monthly_grant").eq("user_id", user.id).maybeSingle(),
         supabase.from("messages").select("created_at").eq("user_id", user.id).eq("role", "user").gte("created_at", since),
@@ -40,7 +39,6 @@ function UsagePage() {
       setByDay(Array.from(buckets.entries()).map(([day, n]) => ({ day, n })));
       setStats({
         chats: chats.count ?? 0,
-        messages: msgs.count ?? 0,
         memories: mems.count ?? 0,
         credits: creditRow.data?.balance ?? 0,
         monthly: creditRow.data?.monthly_grant ?? 0,
@@ -62,10 +60,9 @@ function UsagePage() {
         <h1 className="font-display text-4xl md:text-5xl">Usage</h1>
         <p className="mt-2 text-muted-foreground">A clean view of how you've been using Razen.</p>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 grid gap-4 sm:grid-cols-3">
           <Stat icon={Zap} label="Credits left" value={stats.credits.toLocaleString()} hint={`of ${stats.monthly.toLocaleString()}`} />
           <Stat icon={MessageSquare} label="Total chats" value={stats.chats.toLocaleString()} />
-          <Stat icon={TrendingUp} label="Messages sent" value={stats.messages.toLocaleString()} />
           <Stat icon={Brain} label="Memories" value={stats.memories.toLocaleString()} />
         </div>
 
