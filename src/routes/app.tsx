@@ -56,21 +56,26 @@ function AppPage() {
   const search = Route.useSearch() as { upgraded?: string };
 
   // Estimated cost preview (mirrors edge `route()` heuristics).
+  // Build mode uses cheaper models via build-codegen and has its own scale.
   const estimatedCost = (() => {
-    const heavy = input.length > 1200 || mode === "build" || mode === "plan";
+    const heavy = input.length > 1200 || mode === "plan";
+    const buildHeavy = input.length > 800;
+    if (mode === "build") {
+      if (tier === "elite") return buildHeavy ? 6 : 4;
+      if (tier === "pro") return buildHeavy ? 4 : 3;
+      return buildHeavy ? 3 : 2;
+    }
     if (tier === "elite") {
-      if (mode === "build") return heavy ? 18 : 12;
       if (mode === "plan") return heavy ? 14 : 10;
       if (mode === "write") return heavy ? 10 : 7;
       return heavy ? 5 : 3;
     }
     if (tier === "pro") {
-      if (mode === "build") return heavy ? 10 : 7;
       if (mode === "plan") return heavy ? 8 : 6;
       if (mode === "write") return heavy ? 6 : 4;
       return heavy ? 3 : 2;
     }
-    if (mode === "build" || mode === "plan") return 3;
+    if (mode === "plan") return 3;
     if (mode === "write") return 2;
     return heavy ? 2 : 1;
   })();
