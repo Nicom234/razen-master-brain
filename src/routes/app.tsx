@@ -332,16 +332,27 @@ function AppPage() {
           {convs.length === 0 ? (
             <p className="px-2 text-xs text-muted-foreground">No chats yet.</p>
           ) : convs.map((c) => (
-            <div key={c.id} className={`group flex items-center gap-1 rounded-md px-1 ${convId === c.id ? "bg-muted" : ""}`}>
+            <div key={c.id} className={`group relative mb-0.5 rounded-md ${convId === c.id ? "bg-muted" : ""}`}>
               <button
                 onClick={() => openConv(c.id)}
-                className="flex-1 truncate rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
+                className="block w-full rounded-md px-2.5 py-2 pr-8 text-left hover:bg-muted/70"
               >
-                <MessageSquare className="mr-2 inline h-3.5 w-3.5 text-muted-foreground" />
-                {c.title}
+                <div className="flex items-center gap-1.5">
+                  <MessageSquare className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  <span className="truncate text-[13px] font-medium">{c.title}</span>
+                </div>
+                {c.preview && (
+                  <p className="ml-[18px] mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                    {c.preview}
+                  </p>
+                )}
               </button>
-              <button onClick={() => deleteConv(c.id)} className="opacity-0 transition group-hover:opacity-100">
-                <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteConv(c.id); }}
+                className="absolute right-1.5 top-2 rounded p-1 opacity-0 transition group-hover:opacity-100 hover:bg-background"
+                title="Delete chat"
+              >
+                <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
               </button>
             </div>
           ))}
