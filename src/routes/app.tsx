@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { stripeEnv } from "@/lib/stripe";
 import { MemoryPanel } from "@/components/MemoryPanel";
+import { BuildWorkspace } from "@/components/build/BuildWorkspace";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Razen" }, { name: "description", content: "Your AI employee." }] }),
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/app")({
 type Msg = { role: "user" | "assistant"; content: string };
 type Tier = "free" | "pro" | "elite";
 type Mode = "research" | "write" | "plan" | "build";
-type Conv = { id: string; title: string; updated_at: string };
+type Conv = { id: string; title: string; updated_at: string; preview?: string };
 
 const MODES: { id: Mode; label: string; icon: typeof Search; hint: string }[] = [
   { id: "research", label: "Research", icon: Search, hint: "Cited research with live web sources" },
@@ -38,7 +39,7 @@ function AppPage() {
   const [tier, setTier] = useState<Tier>("free");
   const [credits, setCredits] = useState<number | null>(null);
   const [monthlyGrant, setMonthlyGrant] = useState<number>(25);
-  const [stats, setStats] = useState<{ chats: number; messages: number; memories: number }>({ chats: 0, messages: 0, memories: 0 });
+  const [stats, setStats] = useState<{ chats: number; memories: number }>({ chats: 0, memories: 0 });
   const [lastModel, setLastModel] = useState<string | null>(null);
   const [lastCost, setLastCost] = useState<number | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -55,21 +56,26 @@ function AppPage() {
   const search = Route.useSearch() as { upgraded?: string };
 
   // Estimated cost preview (mirrors edge `route()` heuristics).
+  // Build mode uses cheaper models via build-codegen and has its own scale.
   const estimatedCost = (() => {
-    const heavy = input.length > 1200 || mode === "build" || mode === "plan";
+    const heavy = input.length > 1200 || mode === "plan";
+    const buildHeavy = input.length > 800;
+    if (mode === "build") {
+      if (tier === "elite") return buildHeavy ? 6 : 4;
+      if (tier === "pro") return buildHeavy ? 4 : 3;
+      return buildHeavy ? 3 : 2;
+    }
     if (tier === "elite") {
-      if (mode === "build") return heavy ? 18 : 12;
       if (mode === "plan") return heavy ? 14 : 10;
       if (mode === "write") return heavy ? 10 : 7;
       return heavy ? 5 : 3;
     }
     if (tier === "pro") {
-      if (mode === "build") return heavy ? 10 : 7;
       if (mode === "plan") return heavy ? 8 : 6;
       if (mode === "write") return heavy ? 6 : 4;
       return heavy ? 3 : 2;
     }
-    if (mode === "build" || mode === "plan") return 3;
+    if (mode === "plan") return 3;
     if (mode === "write") return 2;
     return heavy ? 2 : 1;
   })();
@@ -105,17 +111,28 @@ function AppPage() {
   };
 
   const loadConvs = async (uid: string) => {
-    const { data } = await supabase.from("conversations").select("id,title,updated_at").eq("user_id", uid).order("updated_at", { ascending: false }).limit(50);
-    if (data) setConvs(data);
+    const { data: convData } = await supabase.from("conversations").select("id,title,updated_at").eq("user_id", uid).order("updated_at", { ascending: false }).limit(50);
+    if (!convData) return;
+    // Fetch first user message for each conv as preview, in one query
+    const ids = convData.map((c) => c.id);
+    let previewMap = new Map<string, string>();
+    if (ids.length) {
+      const { data: msgData } = await supabase
+        .from("messages").select("conversation_id,content,created_at,role")
+        .in("conversation_id", ids).eq("role", "user").order("created_at", { ascending: true });
+      msgData?.forEach((m) => {
+        if (!previewMap.has(m.conversation_id)) previewMap.set(m.conversation_id, m.content);
+      });
+    }
+    setConvs(convData.map((c) => ({ ...c, preview: previewMap.get(c.id) })));
   };
 
   const loadStats = async (uid: string) => {
-    const [chats, msgs, mems] = await Promise.all([
+    const [chats, mems] = await Promise.all([
       supabase.from("conversations").select("id", { count: "exact", head: true }).eq("user_id", uid),
-      supabase.from("messages").select("id", { count: "exact", head: true }).eq("user_id", uid).eq("role", "user"),
       supabase.from("memories").select("id", { count: "exact", head: true }).eq("user_id", uid),
     ]);
-    setStats({ chats: chats.count ?? 0, messages: msgs.count ?? 0, memories: mems.count ?? 0 });
+    setStats({ chats: chats.count ?? 0, memories: mems.count ?? 0 });
   };
 
   useEffect(() => {
@@ -320,16 +337,27 @@ function AppPage() {
           {convs.length === 0 ? (
             <p className="px-2 text-xs text-muted-foreground">No chats yet.</p>
           ) : convs.map((c) => (
-            <div key={c.id} className={`group flex items-center gap-1 rounded-md px-1 ${convId === c.id ? "bg-muted" : ""}`}>
+            <div key={c.id} className={`group relative mb-0.5 rounded-md ${convId === c.id ? "bg-muted" : ""}`}>
               <button
                 onClick={() => openConv(c.id)}
-                className="flex-1 truncate rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
+                className="block w-full rounded-md px-2.5 py-2 pr-8 text-left hover:bg-muted/70"
               >
-                <MessageSquare className="mr-2 inline h-3.5 w-3.5 text-muted-foreground" />
-                {c.title}
+                <div className="flex items-center gap-1.5">
+                  <MessageSquare className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  <span className="truncate text-[13px] font-medium">{c.title}</span>
+                </div>
+                {c.preview && (
+                  <p className="ml-[18px] mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                    {c.preview}
+                  </p>
+                )}
               </button>
-              <button onClick={() => deleteConv(c.id)} className="opacity-0 transition group-hover:opacity-100">
-                <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteConv(c.id); }}
+                className="absolute right-1.5 top-2 rounded p-1 opacity-0 transition group-hover:opacity-100 hover:bg-background"
+                title="Delete chat"
+              >
+                <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
               </button>
             </div>
           ))}
@@ -405,6 +433,13 @@ function AppPage() {
           </div>
         </header>
 
+        {mode === "build" ? (
+          <BuildWorkspace
+            onExitBuild={() => setMode("research")}
+            onCreditsChange={setCredits}
+          />
+        ) : (
+        <>
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-10">
             {messages.length === 0 && !convId ? (
@@ -418,10 +453,9 @@ function AppPage() {
                 </div>
 
                 {/* Stats strip */}
-                <div className="grid gap-3 sm:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-3">
                   <StatCard label="Credits left" value={credits?.toLocaleString() ?? "—"} sub={`of ${monthlyGrant.toLocaleString()} ${tier === "free" ? "today" : "this month"}`} icon={Zap} />
                   <StatCard label="Conversations" value={stats.chats.toLocaleString()} sub="lifetime" icon={MessageSquare} />
-                  <StatCard label="Messages sent" value={stats.messages.toLocaleString()} sub="lifetime" icon={ArrowUp} />
                   <StatCard label="Memories" value={stats.memories.toLocaleString()} sub={tier === "elite" ? "active" : "Elite feature"} icon={Brain} />
                 </div>
 
@@ -575,6 +609,8 @@ function AppPage() {
             </p>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );
