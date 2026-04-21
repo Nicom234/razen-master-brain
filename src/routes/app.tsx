@@ -430,10 +430,9 @@ function AppPage() {
                 </div>
 
                 {/* Stats strip */}
-                <div className="grid gap-3 sm:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-3">
                   <StatCard label="Credits left" value={credits?.toLocaleString() ?? "—"} sub={`of ${monthlyGrant.toLocaleString()} ${tier === "free" ? "today" : "this month"}`} icon={Zap} />
                   <StatCard label="Conversations" value={stats.chats.toLocaleString()} sub="lifetime" icon={MessageSquare} />
-                  <StatCard label="Messages sent" value={stats.messages.toLocaleString()} sub="lifetime" icon={ArrowUp} />
                   <StatCard label="Memories" value={stats.memories.toLocaleString()} sub={tier === "elite" ? "active" : "Elite feature"} icon={Brain} />
                 </div>
 
