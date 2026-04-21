@@ -8,7 +8,7 @@ export const Route = createFileRoute("/changelog")({
 
 const ENTRIES = [
   { date: "2026-04", title: "Command palette + dashboard", body: "⌘K opens anywhere. New /app dashboard, /usage analytics, /history with pinning, sharing and search." },
-  { date: "2026-04", title: "Multi-model routing", body: "Razen now routes Research → Gemini Flash, Write/Plan/Build → Claude Sonnet 4.5 (Elite) or Haiku 4.5 (Pro). The right brain for the job." },
+  { date: "2026-04", title: "Smart model routing", body: "Razen now sends each task to the model best suited for it — fast lookups stay snappy, deep work gets the firepower it deserves. Details on the models page." },
   { date: "2026-04", title: "Long-term memory", body: "Pro and Elite users get a memory store. Razen learns your role, projects, and voice — and uses it every reply." },
   { date: "2026-04", title: "Variable credit cost", body: "Light tasks cost 1–3 credits. Heavy plans and code generations cost more. You see the price before you send." },
 ];

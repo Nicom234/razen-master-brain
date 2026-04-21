@@ -139,10 +139,10 @@ function Marquee() {
 
 function Modes() {
   const items = [
-    { icon: Search, title: "Research", body: "Live web search with cited sources. Cross-references, fact-checks, writes a brief — not a hallucination.", badge: "Gemini Flash" },
-    { icon: PenTool, title: "Write", body: "Drafts, edits, polishes. Matches your tone. Returns clean copy with a change-log of every cut.", badge: "Claude Sonnet" },
-    { icon: ListChecks, title: "Plan", body: "Turns a vague goal into a structured plan with owners, timelines, risks and a definition of done.", badge: "Claude Sonnet" },
-    { icon: Code2, title: "Build", body: "Writes runnable code. Reviews architectures. Debugs. Returns artifacts you can ship today.", badge: "Claude Sonnet" },
+    { icon: Search, title: "Research", body: "Live web search with cited sources. Cross-references, fact-checks, writes a brief — not a hallucination.", badge: "Cited sources" },
+    { icon: PenTool, title: "Write", body: "Drafts, edits, polishes. Matches your tone. Returns clean copy with a change-log of every cut.", badge: "Editorial-grade" },
+    { icon: ListChecks, title: "Plan", body: "Turns a vague goal into a structured plan with owners, timelines, risks and a definition of done.", badge: "McKinsey-grade" },
+    { icon: Code2, title: "Build", body: "Writes runnable code. Reviews architectures. Debugs. Returns artifacts you can ship today.", badge: "Staff-engineer" },
   ];
   return (
     <section>
@@ -151,7 +151,7 @@ function Modes() {
           <p className="text-sm font-medium text-primary">Four specialists. One brain.</p>
           <h2 className="mt-3 font-display text-4xl md:text-6xl">A team in a tab.</h2>
           <p className="mt-5 text-lg text-muted-foreground">
-            Switch modes inside the same chat. Razen picks the right model for the job, every time.
+            Switch modes inside the same chat. Razen picks the right brain for the job, every time.
           </p>
         </div>
         <div className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
@@ -221,7 +221,7 @@ function Demo() {
               </div>
               <span className="ml-3 text-xs text-muted-foreground">razen — research mode</span>
             </div>
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">Gemini Flash</span>
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">Live web · grounded</span>
           </div>
           <div className="space-y-4 p-7 text-sm leading-relaxed">
             <div className="rounded-xl bg-muted px-4 py-3 text-foreground/90">
@@ -248,13 +248,13 @@ function Demo() {
 
 function Compare() {
   const rows = [
-    { f: "Multi-model routing", razen: true, chatgpt: false, claude: false },
+    { f: "Auto-routes to the best model per task", razen: true, chatgpt: false, claude: false },
     { f: "Live web research with citations", razen: true, chatgpt: true, claude: false },
     { f: "Long-term memory across chats", razen: true, chatgpt: true, claude: false },
     { f: "Mode-specific system prompts", razen: true, chatgpt: false, claude: false },
-    { f: "Per-task pricing (pay for what you use)", razen: true, chatgpt: false, claude: false },
+    { f: "Per-task pricing — pay for what you use", razen: true, chatgpt: false, claude: false },
     { f: "Markdown export of any chat", razen: true, chatgpt: false, claude: false },
-    { f: "Free daily credits, no card", razen: true, chatgpt: true, claude: true },
+    { f: "Public share links for any reply", razen: true, chatgpt: false, claude: false },
     { f: "Starting price", razen: "Free", chatgpt: "$20/mo", claude: "$20/mo" },
   ];
   return (
@@ -342,7 +342,7 @@ function CTA() {
           Stop juggling tabs.
         </h2>
         <p className="mx-auto mt-6 max-w-xl text-lg text-background/70">
-          Hire Razen. 25 free credits every day, forever. Upgrade only when you outgrow them.
+          Hire Razen. The work of a full team — research, writing, planning, building — in one chat.
         </p>
         <div className="mt-10 flex flex-wrap justify-center gap-3">
           <Link to="/signup">
