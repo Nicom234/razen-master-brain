@@ -16,22 +16,28 @@ export type Database = {
     Tables: {
       conversations: {
         Row: {
+          archived: boolean
           created_at: string
           id: string
+          pinned: boolean
           title: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          archived?: boolean
           created_at?: string
           id?: string
+          pinned?: boolean
           title?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          archived?: boolean
           created_at?: string
           id?: string
+          pinned?: boolean
           title?: string
           updated_at?: string
           user_id?: string
@@ -154,6 +160,38 @@ export type Database = {
         }
         Relationships: []
       }
+      share_tokens: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          token: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "share_tokens_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           created_at: string
@@ -211,6 +249,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          briefing_topic: string | null
+          daily_briefing: boolean
+          default_mode: string
+          reduce_motion: boolean
+          theme: string
+          updated_at: string
+          user_id: string
+          web_search_default: boolean
+        }
+        Insert: {
+          briefing_topic?: string | null
+          daily_briefing?: boolean
+          default_mode?: string
+          reduce_motion?: boolean
+          theme?: string
+          updated_at?: string
+          user_id: string
+          web_search_default?: boolean
+        }
+        Update: {
+          briefing_topic?: string | null
+          daily_briefing?: boolean
+          default_mode?: string
+          reduce_motion?: boolean
+          theme?: string
+          updated_at?: string
+          user_id?: string
+          web_search_default?: boolean
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -220,6 +291,15 @@ export type Database = {
         | { Args: { _user_id: string }; Returns: number }
         | { Args: { _cost?: number; _user_id: string }; Returns: number }
       ensure_credits: { Args: { _user_id: string }; Returns: number }
+      get_shared_chat: {
+        Args: { _token: string }
+        Returns: {
+          content: string
+          created_at: string
+          role: string
+          title: string
+        }[]
+      }
       grant_subscription_credits: {
         Args: {
           _tier: Database["public"]["Enums"]["subscription_tier"]

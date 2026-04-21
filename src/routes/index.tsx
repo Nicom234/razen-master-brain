@@ -379,9 +379,13 @@ function Footer() {
           <div className="grid h-6 w-6 place-items-center rounded bg-foreground text-background font-display text-xs">R</div>
           <span>© {new Date().getFullYear()} Razen AI</span>
         </div>
-        <div className="flex gap-6">
+        <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
           <Link to="/features" className="hover:text-foreground">Capabilities</Link>
           <Link to="/pricing" className="hover:text-foreground">Pricing</Link>
+          <Link to="/changelog" className="hover:text-foreground">Changelog</Link>
+          <Link to="/shortcuts" className="hover:text-foreground">Shortcuts</Link>
+          <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+          <Link to="/terms" className="hover:text-foreground">Terms</Link>
           <Link to="/login" className="hover:text-foreground">Sign in</Link>
         </div>
       </div>
