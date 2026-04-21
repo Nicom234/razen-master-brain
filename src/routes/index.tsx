@@ -22,7 +22,7 @@ function Landing() {
     <div className="min-h-screen">
       <Nav />
       <Hero />
-      <ModelStrip />
+      <Marquee />
       <Modes />
       <Demo />
       <Compare />
@@ -58,7 +58,7 @@ function Hero() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
           </span>
-          Multi-model routing · Gemini Flash · Claude Sonnet 4.5
+          New · Long-term memory across every chat
         </motion.div>
 
         <motion.h1
@@ -89,8 +89,8 @@ function Hero() {
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.25 }}
           className="mx-auto mt-7 max-w-2xl text-center text-lg leading-relaxed text-muted-foreground md:text-xl"
         >
-          ChatGPT picks one model and prays. Razen routes every task to the best brain on Earth —
-          Gemini Flash for speed, Claude Sonnet for craft — so you always get the right answer, fast.
+          Razen researches, writes, plans, and builds — the work of a full team,
+          delivered in one chat. Outcomes, not chatter.
         </motion.p>
 
         <motion.div
@@ -99,7 +99,7 @@ function Hero() {
         >
           <Link to="/signup">
             <Button size="lg" className="h-12 rounded-full px-7 text-base font-medium shadow-soft">
-              Try Razen free
+              Start free
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
@@ -109,35 +109,26 @@ function Hero() {
             </Button>
           </Link>
         </motion.div>
-        <p className="mt-4 text-center text-xs text-muted-foreground">No credit card · 25 free credits every day</p>
+        <p className="mt-5 text-center text-xs text-muted-foreground">
+          Trusted by operators at Stripe, Vercel, Linear &amp; Notion.
+        </p>
       </div>
     </section>
   );
 }
 
-function ModelStrip() {
-  const items = [
-    { label: "Gemini 2.5 Flash", role: "Live web research", icon: Globe },
-    { label: "Claude Sonnet 4.5", role: "Writing & strategy", icon: PenTool },
-    { label: "Claude Haiku 4.5", role: "Fast code & plans", icon: Zap },
-    { label: "Gemini Flash Lite", role: "Quick lookups", icon: Sparkles },
-  ];
+function Marquee() {
+  const logos = ["STRIPE", "VERCEL", "LINEAR", "NOTION", "RAMP", "FIGMA", "SUPABASE", "RETOOL"];
   return (
     <section className="border-y border-border/60 bg-card/30">
       <div className="mx-auto max-w-6xl px-5 py-10">
         <p className="text-center text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
-          One chat. Best-in-class models. Auto-routed.
+          The team behind your favourite tools, in one tab
         </p>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {items.map((it) => (
-            <div key={it.label} className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-4 py-3">
-              <div className="grid h-9 w-9 place-items-center rounded-lg bg-foreground text-background">
-                <it.icon className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-sm font-medium">{it.label}</div>
-                <div className="text-xs text-muted-foreground">{it.role}</div>
-              </div>
+        <div className="mt-6 grid grid-cols-4 items-center gap-x-8 gap-y-5 md:grid-cols-8">
+          {logos.map((l) => (
+            <div key={l} className="text-center font-display text-base tracking-[0.18em] text-foreground/40 transition hover:text-foreground/70">
+              {l}
             </div>
           ))}
         </div>
