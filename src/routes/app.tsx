@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { stripeEnv } from "@/lib/stripe";
 import { MemoryPanel } from "@/components/MemoryPanel";
+import { BuildWorkspace } from "@/components/build/BuildWorkspace";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Razen" }, { name: "description", content: "Your AI employee." }] }),
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/app")({
 type Msg = { role: "user" | "assistant"; content: string };
 type Tier = "free" | "pro" | "elite";
 type Mode = "research" | "write" | "plan" | "build";
-type Conv = { id: string; title: string; updated_at: string };
+type Conv = { id: string; title: string; updated_at: string; preview?: string };
 
 const MODES: { id: Mode; label: string; icon: typeof Search; hint: string }[] = [
   { id: "research", label: "Research", icon: Search, hint: "Cited research with live web sources" },
@@ -38,7 +39,7 @@ function AppPage() {
   const [tier, setTier] = useState<Tier>("free");
   const [credits, setCredits] = useState<number | null>(null);
   const [monthlyGrant, setMonthlyGrant] = useState<number>(25);
-  const [stats, setStats] = useState<{ chats: number; messages: number; memories: number }>({ chats: 0, messages: 0, memories: 0 });
+  const [stats, setStats] = useState<{ chats: number; memories: number }>({ chats: 0, memories: 0 });
   const [lastModel, setLastModel] = useState<string | null>(null);
   const [lastCost, setLastCost] = useState<number | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -105,17 +106,28 @@ function AppPage() {
   };
 
   const loadConvs = async (uid: string) => {
-    const { data } = await supabase.from("conversations").select("id,title,updated_at").eq("user_id", uid).order("updated_at", { ascending: false }).limit(50);
-    if (data) setConvs(data);
+    const { data: convData } = await supabase.from("conversations").select("id,title,updated_at").eq("user_id", uid).order("updated_at", { ascending: false }).limit(50);
+    if (!convData) return;
+    // Fetch first user message for each conv as preview, in one query
+    const ids = convData.map((c) => c.id);
+    let previewMap = new Map<string, string>();
+    if (ids.length) {
+      const { data: msgData } = await supabase
+        .from("messages").select("conversation_id,content,created_at,role")
+        .in("conversation_id", ids).eq("role", "user").order("created_at", { ascending: true });
+      msgData?.forEach((m) => {
+        if (!previewMap.has(m.conversation_id)) previewMap.set(m.conversation_id, m.content);
+      });
+    }
+    setConvs(convData.map((c) => ({ ...c, preview: previewMap.get(c.id) })));
   };
 
   const loadStats = async (uid: string) => {
-    const [chats, msgs, mems] = await Promise.all([
+    const [chats, mems] = await Promise.all([
       supabase.from("conversations").select("id", { count: "exact", head: true }).eq("user_id", uid),
-      supabase.from("messages").select("id", { count: "exact", head: true }).eq("user_id", uid).eq("role", "user"),
       supabase.from("memories").select("id", { count: "exact", head: true }).eq("user_id", uid),
     ]);
-    setStats({ chats: chats.count ?? 0, messages: msgs.count ?? 0, memories: mems.count ?? 0 });
+    setStats({ chats: chats.count ?? 0, memories: mems.count ?? 0 });
   };
 
   useEffect(() => {
