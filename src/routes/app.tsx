@@ -603,6 +603,7 @@ function AppPage() {
             </p>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
