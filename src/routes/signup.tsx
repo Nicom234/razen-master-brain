@@ -10,7 +10,7 @@ import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/signup")({
-  head: () => ({ meta: [{ title: "Get started — Razen" }, { name: "description", content: "Create your Razen account. 25 free messages every day." }] }),
+  head: () => ({ meta: [{ title: "Get started — Razen" }, { name: "description", content: "Create your Razen account in under a minute." }] }),
   component: Signup,
 });
 
@@ -49,7 +49,7 @@ function Signup() {
       <Nav />
       <div className="mx-auto flex max-w-md flex-col px-5 py-16">
         <h1 className="font-display text-5xl">Hire Razen.</h1>
-        <p className="mt-3 text-muted-foreground">25 free messages, every day. No card.</p>
+        <p className="mt-3 text-muted-foreground">One chat. Every mode. Start in under a minute.</p>
 
         {sent ? (
           <div className="mt-8 rounded-2xl border border-border/70 bg-card/70 p-7 shadow-soft">

@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { ArrowRight, Search, PenTool, ListChecks, Code2, Quote, Check, Minus, Sparkles, Zap, Brain, Globe } from "lucide-react";
+import { ArrowRight, Search, PenTool, ListChecks, Code2, Quote, Check, Minus, Brain } from "lucide-react";
 import { Nav } from "@/components/Nav";
 import { Button } from "@/components/ui/button";
 
@@ -9,9 +9,9 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Razen — The AI employee" },
-      { name: "description", content: "Razen routes every task to the best model — Gemini Flash, Claude Sonnet, Claude Haiku — so you get the right brain for the job. The output of a team, in one chat." },
+      { name: "description", content: "Razen is the AI employee that researches, writes, plans, and builds — the work of a full team, delivered in one chat." },
       { property: "og:title", content: "Razen — The AI employee" },
-      { property: "og:description", content: "Multi-model AI: Gemini Flash for speed, Claude Sonnet for craft. Researches, writes, plans, builds. One chat." },
+      { property: "og:description", content: "Research. Write. Plan. Build. The work of a full team, in one chat." },
     ],
   }),
   component: Landing,
