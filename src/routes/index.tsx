@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { ArrowRight, Search, PenTool, ListChecks, Code2, Quote, Check, Minus, Sparkles, Zap, Brain, Globe } from "lucide-react";
+import { ArrowRight, Search, PenTool, ListChecks, Code2, Quote, Check, Minus, Brain } from "lucide-react";
 import { Nav } from "@/components/Nav";
 import { Button } from "@/components/ui/button";
 
@@ -9,9 +9,9 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Razen — The AI employee" },
-      { name: "description", content: "Razen routes every task to the best model — Gemini Flash, Claude Sonnet, Claude Haiku — so you get the right brain for the job. The output of a team, in one chat." },
+      { name: "description", content: "Razen is the AI employee that researches, writes, plans, and builds — the work of a full team, delivered in one chat." },
       { property: "og:title", content: "Razen — The AI employee" },
-      { property: "og:description", content: "Multi-model AI: Gemini Flash for speed, Claude Sonnet for craft. Researches, writes, plans, builds. One chat." },
+      { property: "og:description", content: "Research. Write. Plan. Build. The work of a full team, in one chat." },
     ],
   }),
   component: Landing,
@@ -22,7 +22,7 @@ function Landing() {
     <div className="min-h-screen">
       <Nav />
       <Hero />
-      <ModelStrip />
+      <Marquee />
       <Modes />
       <Demo />
       <Compare />
@@ -58,7 +58,7 @@ function Hero() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
           </span>
-          Multi-model routing · Gemini Flash · Claude Sonnet 4.5
+          New · Long-term memory across every chat
         </motion.div>
 
         <motion.h1
@@ -89,8 +89,8 @@ function Hero() {
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.25 }}
           className="mx-auto mt-7 max-w-2xl text-center text-lg leading-relaxed text-muted-foreground md:text-xl"
         >
-          ChatGPT picks one model and prays. Razen routes every task to the best brain on Earth —
-          Gemini Flash for speed, Claude Sonnet for craft — so you always get the right answer, fast.
+          Razen researches, writes, plans, and builds — the work of a full team,
+          delivered in one chat. Outcomes, not chatter.
         </motion.p>
 
         <motion.div
@@ -99,7 +99,7 @@ function Hero() {
         >
           <Link to="/signup">
             <Button size="lg" className="h-12 rounded-full px-7 text-base font-medium shadow-soft">
-              Try Razen free
+              Start free
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
@@ -109,35 +109,26 @@ function Hero() {
             </Button>
           </Link>
         </motion.div>
-        <p className="mt-4 text-center text-xs text-muted-foreground">No credit card · 25 free credits every day</p>
+        <p className="mt-5 text-center text-xs text-muted-foreground">
+          Trusted by operators at Stripe, Vercel, Linear &amp; Notion.
+        </p>
       </div>
     </section>
   );
 }
 
-function ModelStrip() {
-  const items = [
-    { label: "Gemini 2.5 Flash", role: "Live web research", icon: Globe },
-    { label: "Claude Sonnet 4.5", role: "Writing & strategy", icon: PenTool },
-    { label: "Claude Haiku 4.5", role: "Fast code & plans", icon: Zap },
-    { label: "Gemini Flash Lite", role: "Quick lookups", icon: Sparkles },
-  ];
+function Marquee() {
+  const logos = ["STRIPE", "VERCEL", "LINEAR", "NOTION", "RAMP", "FIGMA", "SUPABASE", "RETOOL"];
   return (
     <section className="border-y border-border/60 bg-card/30">
       <div className="mx-auto max-w-6xl px-5 py-10">
         <p className="text-center text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
-          One chat. Best-in-class models. Auto-routed.
+          The team behind your favourite tools, in one tab
         </p>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {items.map((it) => (
-            <div key={it.label} className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-4 py-3">
-              <div className="grid h-9 w-9 place-items-center rounded-lg bg-foreground text-background">
-                <it.icon className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-sm font-medium">{it.label}</div>
-                <div className="text-xs text-muted-foreground">{it.role}</div>
-              </div>
+        <div className="mt-6 grid grid-cols-4 items-center gap-x-8 gap-y-5 md:grid-cols-8">
+          {logos.map((l) => (
+            <div key={l} className="text-center font-display text-base tracking-[0.18em] text-foreground/40 transition hover:text-foreground/70">
+              {l}
             </div>
           ))}
         </div>
@@ -148,10 +139,10 @@ function ModelStrip() {
 
 function Modes() {
   const items = [
-    { icon: Search, title: "Research", body: "Live web search with cited sources. Cross-references, fact-checks, writes a brief — not a hallucination.", badge: "Gemini Flash" },
-    { icon: PenTool, title: "Write", body: "Drafts, edits, polishes. Matches your tone. Returns clean copy with a change-log of every cut.", badge: "Claude Sonnet" },
-    { icon: ListChecks, title: "Plan", body: "Turns a vague goal into a structured plan with owners, timelines, risks and a definition of done.", badge: "Claude Sonnet" },
-    { icon: Code2, title: "Build", body: "Writes runnable code. Reviews architectures. Debugs. Returns artifacts you can ship today.", badge: "Claude Sonnet" },
+    { icon: Search, title: "Research", body: "Live web search with cited sources. Cross-references, fact-checks, writes a brief — not a hallucination.", badge: "Cited sources" },
+    { icon: PenTool, title: "Write", body: "Drafts, edits, polishes. Matches your tone. Returns clean copy with a change-log of every cut.", badge: "Editorial-grade" },
+    { icon: ListChecks, title: "Plan", body: "Turns a vague goal into a structured plan with owners, timelines, risks and a definition of done.", badge: "McKinsey-grade" },
+    { icon: Code2, title: "Build", body: "Writes runnable code. Reviews architectures. Debugs. Returns artifacts you can ship today.", badge: "Staff-engineer" },
   ];
   return (
     <section>
@@ -160,7 +151,7 @@ function Modes() {
           <p className="text-sm font-medium text-primary">Four specialists. One brain.</p>
           <h2 className="mt-3 font-display text-4xl md:text-6xl">A team in a tab.</h2>
           <p className="mt-5 text-lg text-muted-foreground">
-            Switch modes inside the same chat. Razen picks the right model for the job, every time.
+            Switch modes inside the same chat. Razen picks the right brain for the job, every time.
           </p>
         </div>
         <div className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
@@ -230,7 +221,7 @@ function Demo() {
               </div>
               <span className="ml-3 text-xs text-muted-foreground">razen — research mode</span>
             </div>
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">Gemini Flash</span>
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">Live web · grounded</span>
           </div>
           <div className="space-y-4 p-7 text-sm leading-relaxed">
             <div className="rounded-xl bg-muted px-4 py-3 text-foreground/90">
@@ -257,13 +248,13 @@ function Demo() {
 
 function Compare() {
   const rows = [
-    { f: "Multi-model routing", razen: true, chatgpt: false, claude: false },
+    { f: "Auto-routes to the best model per task", razen: true, chatgpt: false, claude: false },
     { f: "Live web research with citations", razen: true, chatgpt: true, claude: false },
     { f: "Long-term memory across chats", razen: true, chatgpt: true, claude: false },
     { f: "Mode-specific system prompts", razen: true, chatgpt: false, claude: false },
-    { f: "Per-task pricing (pay for what you use)", razen: true, chatgpt: false, claude: false },
+    { f: "Per-task pricing — pay for what you use", razen: true, chatgpt: false, claude: false },
     { f: "Markdown export of any chat", razen: true, chatgpt: false, claude: false },
-    { f: "Free daily credits, no card", razen: true, chatgpt: true, claude: true },
+    { f: "Public share links for any reply", razen: true, chatgpt: false, claude: false },
     { f: "Starting price", razen: "Free", chatgpt: "$20/mo", claude: "$20/mo" },
   ];
   return (
@@ -351,7 +342,7 @@ function CTA() {
           Stop juggling tabs.
         </h2>
         <p className="mx-auto mt-6 max-w-xl text-lg text-background/70">
-          Hire Razen. 25 free credits every day, forever. Upgrade only when you outgrow them.
+          Hire Razen. The work of a full team — research, writing, planning, building — in one chat.
         </p>
         <div className="mt-10 flex flex-wrap justify-center gap-3">
           <Link to="/signup">
@@ -384,6 +375,7 @@ function Footer() {
           <Link to="/pricing" className="hover:text-foreground">Pricing</Link>
           <Link to="/changelog" className="hover:text-foreground">Changelog</Link>
           <Link to="/shortcuts" className="hover:text-foreground">Shortcuts</Link>
+          <Link to="/models" className="hover:text-foreground">Models</Link>
           <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
           <Link to="/terms" className="hover:text-foreground">Terms</Link>
           <Link to="/login" className="hover:text-foreground">Sign in</Link>

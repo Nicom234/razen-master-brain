@@ -25,9 +25,8 @@ const tiers = [
     id: "free", priceId: null, name: "Free", price: "£0", period: "forever",
     tagline: "Try the brain.",
     features: [
-      "25 credits, refilled every day",
+      "Daily credits to start",
       "All four modes — Research · Write · Plan · Build",
-      "Powered by Gemini Flash",
       "Live web search with citations",
       "Conversation history",
     ],
@@ -39,7 +38,7 @@ const tiers = [
     features: [
       "Everything in Free, plus:",
       "400 credits / month",
-      "Claude Haiku 4.5 for writing, planning & code",
+      "Smarter routing for writing, planning &amp; code",
       "Document & image upload (PDFs, screenshots)",
       "Markdown export of any chat",
       "Email support",
@@ -52,9 +51,9 @@ const tiers = [
     features: [
       "Everything in Pro, plus:",
       "1,500 credits / month",
-      "Claude Sonnet 4.5 — the best model on Earth for writing & strategy",
+      "Frontier-grade routing — top-tier model per task",
       "Long-term memory across every chat",
-      "Smart routing — top-tier model per task",
+      "Priority queue · faster responses",
       "Direct founder Slack",
     ],
     cta: "Go Elite", highlight: false,
@@ -186,17 +185,17 @@ function PricingPage() {
             <div className="rounded-xl border border-border/60 bg-background/60 p-4">
               <div className="text-xs uppercase tracking-wider text-muted-foreground">Quick</div>
               <div className="mt-1 font-display text-3xl">1–3 <span className="text-base text-muted-foreground">credits</span></div>
-              <div className="mt-1 text-xs text-muted-foreground">Research, lookups, short Q&amp;A · Gemini Flash</div>
+              <div className="mt-1 text-xs text-muted-foreground">Lookups, short Q&amp;A, snappy research</div>
             </div>
             <div className="rounded-xl border border-border/60 bg-background/60 p-4">
               <div className="text-xs uppercase tracking-wider text-muted-foreground">Smart</div>
               <div className="mt-1 font-display text-3xl">4–10 <span className="text-base text-muted-foreground">credits</span></div>
-              <div className="mt-1 text-xs text-muted-foreground">Writing, planning, longer threads · Claude Haiku</div>
+              <div className="mt-1 text-xs text-muted-foreground">Writing, planning, longer threads</div>
             </div>
             <div className="rounded-xl border border-border/60 bg-background/60 p-4">
               <div className="text-xs uppercase tracking-wider text-muted-foreground">Heavy</div>
               <div className="mt-1 font-display text-3xl">10–18 <span className="text-base text-muted-foreground">credits</span></div>
-              <div className="mt-1 text-xs text-muted-foreground">Build &amp; plan on Elite · Claude Sonnet 4.5</div>
+              <div className="mt-1 text-xs text-muted-foreground">Build mode &amp; deep planning on Elite</div>
             </div>
           </div>
         </div>
