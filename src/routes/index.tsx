@@ -375,6 +375,7 @@ function Footer() {
           <Link to="/pricing" className="hover:text-foreground">Pricing</Link>
           <Link to="/changelog" className="hover:text-foreground">Changelog</Link>
           <Link to="/shortcuts" className="hover:text-foreground">Shortcuts</Link>
+          <Link to="/models" className="hover:text-foreground">Models</Link>
           <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
           <Link to="/terms" className="hover:text-foreground">Terms</Link>
           <Link to="/login" className="hover:text-foreground">Sign in</Link>
