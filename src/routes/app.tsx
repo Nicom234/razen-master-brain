@@ -434,6 +434,7 @@ function AppPage() {
             onCreditsChange={setCredits}
           />
         ) : (
+        <>
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-10">
             {messages.length === 0 && !convId ? (
@@ -603,6 +604,7 @@ function AppPage() {
             </p>
           </div>
         </div>
+        </>
         )}
       </div>
     </div>
