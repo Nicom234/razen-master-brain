@@ -107,30 +107,15 @@ interface Routed { model: string; cost: number; reasoning: "low" | "medium" | "h
 
 function route(tier: string, msgChars: number, isIteration: boolean): Routed {
   const heavy = msgChars > 600 || isIteration;
-  // Real models. Flash-lite produces toy code — never use for build.
+  // Single model across all tiers — Gemini 3 Flash Preview. Same engine that powers
+  // Google AI Studio's strong code output. Tier only changes credit cost + token budget.
   if (tier === "elite") {
-    return {
-      model: "openai/gpt-5",
-      cost: heavy ? 14 : 10,
-      reasoning: heavy ? "high" : "medium",
-      maxTokens: 16000,
-    };
+    return { model: "google/gemini-3-flash-preview", cost: heavy ? 10 : 7, reasoning: null, maxTokens: 16000 };
   }
   if (tier === "pro") {
-    return {
-      model: "openai/gpt-5-mini",
-      cost: heavy ? 8 : 6,
-      reasoning: "medium",
-      maxTokens: 12000,
-    };
+    return { model: "google/gemini-3-flash-preview", cost: heavy ? 6 : 4, reasoning: null, maxTokens: 14000 };
   }
-  // Free tier: still real reasoning. Gemini 2.5 Flash > flash-lite for code.
-  return {
-    model: "google/gemini-2.5-flash",
-    cost: heavy ? 5 : 4,
-    reasoning: null, // gemini flash doesn't take the openai reasoning param
-    maxTokens: 10000,
-  };
+  return { model: "google/gemini-3-flash-preview", cost: heavy ? 4 : 3, reasoning: null, maxTokens: 12000 };
 }
 
 serve(async (req) => {
