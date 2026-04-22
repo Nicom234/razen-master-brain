@@ -62,9 +62,10 @@ Finally:
 interface Routed { model: string; cost: number; }
 function route(tier: string, msgChars: number): Routed {
   const heavy = msgChars > 800;
-  if (tier === "elite") return { model: "google/gemini-2.5-flash", cost: heavy ? 6 : 4 };
-  if (tier === "pro") return { model: "google/gemini-2.5-flash-lite", cost: heavy ? 4 : 3 };
-  return { model: "google/gemini-2.5-flash-lite", cost: heavy ? 3 : 2 };
+  // Build needs real reasoning — flash-lite produces toy output. Step up.
+  if (tier === "elite") return { model: "google/gemini-2.5-pro", cost: heavy ? 8 : 6 };
+  if (tier === "pro") return { model: "google/gemini-2.5-flash", cost: heavy ? 5 : 4 };
+  return { model: "google/gemini-2.5-flash", cost: heavy ? 4 : 3 };
 }
 
 serve(async (req) => {
