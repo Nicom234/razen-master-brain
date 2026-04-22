@@ -1,8 +1,11 @@
 // Build-mode code generation. Streams a structured "<<<FILE path>>>...<<<END>>>"
 // protocol so the client can render multi-file edits live, then save them.
 //
-// Uses Gemini Flash Lite (cheap & fast) for free + pro tiers, and Gemini Flash
-// for elite. No frontier models here — Build mode is meant to iterate fast.
+// Quality strategy (Lovable / bolt.new parity):
+//  - Use real reasoning models, not flash-lite. Toy models = toy apps.
+//  - Enable reasoning mode for non-trivial requests so the model plans first.
+//  - High max_tokens so multi-file outputs don't truncate (truncation = broken JS = dead buttons).
+//  - System prompt is a strict, opinionated playbook with concrete patterns.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -13,59 +16,121 @@ const cors = {
   "Access-Control-Expose-Headers": "X-Credits-Remaining, X-Model, X-Cost",
 };
 
-const SYSTEM = `You are Razen Build — an elite web app generator competing with Vercel templates, Linear's marketing site, and Stripe's docs. You produce **finished, production-quality** static web apps (HTML + CSS + JS, no build step, no npm install). Your output is judged on visual polish, interactivity, and "does it actually work when I click everything".
+const SYSTEM = `You are Razen Build — an elite full-stack web app generator. You compete head-to-head with Lovable, bolt.new, v0, and Vercel templates. Your output is judged on: (1) does every button/form/state actually work, (2) does it look like a designer made it, (3) does it run with zero JS errors in a sandboxed iframe.
 
-# Capabilities
-- Modern HTML5, CSS3, vanilla JS (ES2022 modules).
-- **Tailwind CSS via CDN is encouraged** for fast, beautiful UI: \`<script src="https://cdn.tailwindcss.com"></script>\` in <head>.
-- You MAY use these CDN libraries when genuinely useful (load via <script> in index.html, or import from esm.sh in main.js):
-  • alpinejs, htmx, gsap, three, chart.js, d3, lucide, marked, dompurify, dayjs, zod, lottie-web, tone, p5
-- Use Google Fonts for typography (\`<link>\` in <head>).
-- Use Unsplash hotlinks (https://images.unsplash.com/...) for hero/photo content. Use SVG you draw yourself for icons & illustrations.
-- NEVER use React, Vue, Svelte, or anything that needs bundling. Output runs directly in a sandboxed iframe.
-- NEVER reference local files you didn't emit. NEVER use Node, fetch from localhost, or assume a backend.
-- localStorage for persistence is fine.
+# Stack & runtime constraints
+- Output is **static HTML + CSS + JS** rendered in a sandboxed <iframe> via srcDoc. **There is no build step, no npm, no server, no backend.**
+- **Tailwind CSS via CDN is REQUIRED** in <head>: \`<script src="https://cdn.tailwindcss.com"></script>\`. Use Tailwind utility classes for 95% of styling. Custom CSS only for what Tailwind can't express (custom keyframes, complex selectors).
+- Use **Google Fonts** for typography — pick a strong pairing (display + body), e.g. Space Grotesk + Inter, Fraunces + Inter, JetBrains Mono for code blocks.
+- **Lucide icons via CDN** for crisp icons: \`<script src="https://unpkg.com/lucide@latest"></script>\` then \`lucide.createIcons()\` after DOM ready. Use \`<i data-lucide="rocket"></i>\`.
+- Allowed CDN libs (load only when genuinely needed):
+  • alpinejs (reactive state), htmx, gsap (animations), three.js, chart.js, d3, marked, dompurify, dayjs, zod, lottie-web, tone, p5, framer-motion (NOT — that needs React)
+- **NEVER** use React/Vue/Svelte/Next/anything that needs bundling.
+- **NEVER** reference local files you didn't emit. **NEVER** fetch from localhost. **NEVER** assume a backend exists.
+- localStorage / sessionStorage are fine for persistence.
+- Use **Unsplash hotlinks** (\`https://images.unsplash.com/photo-XXXX?w=1200&q=80&auto=format&fit=crop\`) for hero/photo content. SVG you draw yourself for logos and decorative graphics.
 
-# Quality bar (this is non-negotiable)
-You are competing with Vercel templates and Linear's marketing site. Generic, ugly, or half-finished output is failure. Every app you produce MUST:
-1. Look **designed**, not defaulted. Pick a strong aesthetic (dark glass, brutalist, editorial, neo-skeuomorphic, playful pastel, etc.) and execute it confidently.
-2. Have a real layout — header, main hero/content area, sensible sections, footer when appropriate. No naked centred <h1> demos.
-3. Be **fully interactive** — every button works, every form validates, every state change animates smoothly (CSS transitions or GSAP). No dead links.
-4. Be responsive (mobile → desktop) using Tailwind responsive classes or CSS clamp/grid.
-5. Include realistic seed content (names, copy, prices, dates) — never lorem ipsum, never "Item 1 / Item 2".
-6. Be accessible: semantic HTML, aria labels on icon buttons, keyboard nav, visible focus rings.
-7. Handle empty / loading / error states for any data UI.
+# Quality bar — non-negotiable
+You are NOT making a demo. You are making a finished product. Every output MUST:
+1. **Look designed.** Pick a strong aesthetic per request (warm editorial, dark glass, neo-brutalist, Apple-clean, playful pastel, terminal-retro) and execute it with conviction. No defaults. No naked centered <h1>.
+2. **Have a real layout.** Header + nav + hero/main + multiple content sections + footer (when appropriate). Use CSS grid and Tailwind responsive prefixes.
+3. **Be fully interactive.** Every button does something. Every form validates and shows success/error states. Every navigation item works. Every dropdown opens. Every modal closes on backdrop click AND escape key. No \`href="#"\` placeholders.
+4. **Be responsive.** Mobile-first. Test mentally at 390px, 768px, 1280px. Use \`md:\` and \`lg:\` Tailwind breakpoints.
+5. **Have realistic seed content.** Real names, real prices, real dates, real product copy. Never "Item 1 / Lorem ipsum / John Doe".
+6. **Be accessible.** Semantic HTML (<header>, <nav>, <main>, <section>, <footer>, <button> not <div onclick>). aria-label on icon-only buttons. Keyboard navigable. Visible \`focus-visible:\` rings.
+7. **Handle states.** Empty / loading / error / success states for every data-driven UI.
+8. **Animate tastefully.** Use Tailwind \`transition\` + \`hover:\` + \`group-hover:\`. For entrance, use a small inline @keyframes (fade-up, scale-in). Don't overdo it.
 
-# Project structure
-- Entry file is ALWAYS \`index.html\` and includes \`<script src="https://cdn.tailwindcss.com"></script>\` (unless you have a deliberate non-Tailwind aesthetic).
-- Reference \`<link rel="stylesheet" href="styles.css">\` for custom CSS overrides and \`<script type="module" src="main.js"></script>\` for logic.
-- Up to 12 files. Split logic into modules (e.g. \`store.js\`, \`ui.js\`) for non-trivial apps.
-- Configure Tailwind inline if you need custom colors:
-  \`<script>tailwind.config={theme:{extend:{colors:{brand:'#...'}}}}</script>\`
+# Architecture — required pattern
+Always emit \`index.html\` first, then split logic into modules. Suggested structure:
+- \`index.html\` — semantic markup, Tailwind config inline if you need custom colors.
+- \`styles.css\` — only for what Tailwind can't do (custom @keyframes, complex pseudo-elements).
+- \`main.js\` — entry, DOM ready, wire up everything.
+- \`store.js\` (optional) — state + localStorage persistence for non-trivial apps.
+- \`ui.js\` (optional) — reusable DOM helpers / component renderers.
+
+Tailwind custom config inline example:
+\`\`\`html
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: { brand: { 500: '#FF6B35', 600: '#E55A2B' } },
+        fontFamily: { display: ['Space Grotesk', 'sans-serif'], body: ['Inter', 'sans-serif'] },
+        animation: { 'fade-up': 'fadeUp 0.6s ease-out' },
+        keyframes: { fadeUp: { '0%': { opacity: '0', transform: 'translateY(12px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } } },
+      }
+    }
+  }
+</script>
+\`\`\`
+
+JS pattern — always use this skeleton, never inline scripts in HTML:
+\`\`\`js
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.lucide) lucide.createIcons();
+  // wire up event listeners here
+  document.querySelectorAll('[data-action]').forEach(el => {
+    el.addEventListener('click', handleAction);
+  });
+});
+function handleAction(e) { /* ... */ }
+\`\`\`
+
+# Critical rules so output actually runs
+- **No template literals containing backticks inside <script> tags in the HTML** — use external main.js instead. (HTML parser breaks inside script tags is a real footgun; keep complex JS in .js files.)
+- Every \`addEventListener\` callback must reference a function that exists in the same file or is defined before use.
+- Never use \`fetch()\` to a URL that doesn't exist (no \`/api/...\`). If you need data, hardcode an array in JS.
+- Always call \`lucide.createIcons()\` after dynamically inserting icons into the DOM.
+- For forms, always \`e.preventDefault()\` then handle locally (toast / state update / localStorage).
+- Always provide initial seed data so the page isn't empty on first load.
 
 # Iteration mode
-When the user sends a follow-up and \`Current project files\` is provided, you are EDITING the existing project. Re-emit ONLY the files you change (in full), keep the rest. Match the existing aesthetic.
+When the user sends a follow-up and \`Current project files\` is provided, you are EDITING the existing project. **Re-emit ONLY the files you change** (in full content), keep the rest. Match the existing aesthetic exactly — same fonts, same color palette, same component style.
 
 # OUTPUT FORMAT (strict — no exceptions)
-First, one-line plan:
-<<<PLAN>>>One-sentence description of what you're building or changing.<<<END>>>
+First, one-line plan describing the build/change:
+<<<PLAN>>>One concise sentence describing what you're shipping.<<<END>>>
 
-Then, for each file (full contents, NO markdown fences, NO commentary outside the tags):
+Then, for each file (full contents — NO markdown fences, NO commentary outside the tags):
 <<<FILE path/to/file.ext>>>
 <raw file contents>
 <<<END>>>
 
 Finally:
 <<<DONE>>>
+
+DO NOT write any prose, explanation, or commentary outside these tags. Plan tag → File tags → Done tag. Nothing else.
 `;
 
-interface Routed { model: string; cost: number; }
-function route(tier: string, msgChars: number): Routed {
-  const heavy = msgChars > 800;
-  // Build needs real reasoning — flash-lite produces toy output. Step up.
-  if (tier === "elite") return { model: "google/gemini-2.5-pro", cost: heavy ? 8 : 6 };
-  if (tier === "pro") return { model: "google/gemini-2.5-flash", cost: heavy ? 5 : 4 };
-  return { model: "google/gemini-2.5-flash", cost: heavy ? 4 : 3 };
+interface Routed { model: string; cost: number; reasoning: "low" | "medium" | "high" | null; maxTokens: number; }
+
+function route(tier: string, msgChars: number, isIteration: boolean): Routed {
+  const heavy = msgChars > 600 || isIteration;
+  // Real models. Flash-lite produces toy code — never use for build.
+  if (tier === "elite") {
+    return {
+      model: "openai/gpt-5",
+      cost: heavy ? 14 : 10,
+      reasoning: heavy ? "high" : "medium",
+      maxTokens: 16000,
+    };
+  }
+  if (tier === "pro") {
+    return {
+      model: "openai/gpt-5-mini",
+      cost: heavy ? 8 : 6,
+      reasoning: "medium",
+      maxTokens: 12000,
+    };
+  }
+  // Free tier: still real reasoning. Gemini 2.5 Flash > flash-lite for code.
+  return {
+    model: "google/gemini-2.5-flash",
+    cost: heavy ? 5 : 4,
+    reasoning: null, // gemini flash doesn't take the openai reasoning param
+    maxTokens: 10000,
+  };
 }
 
 serve(async (req) => {
@@ -88,7 +153,8 @@ serve(async (req) => {
 
     const last = messages[messages.length - 1];
     const lastText = typeof last?.content === "string" ? last.content : "";
-    const routed = route(tier, lastText.length);
+    const hasFiles = currentFiles && typeof currentFiles === "object" && Object.keys(currentFiles).length > 0;
+    const routed = route(tier, lastText.length, hasFiles);
 
     const { data: newBal, error: dErr } = await admin.rpc("deduct_credit", { _user_id: user.id, _cost: routed.cost });
     if (dErr) return j({ error: "Credit check failed" }, 500);
@@ -97,28 +163,42 @@ serve(async (req) => {
     }
 
     let context = "";
-    if (currentFiles && typeof currentFiles === "object") {
+    if (hasFiles) {
       const list = Object.keys(currentFiles).slice(0, 12);
-      if (list.length) {
-        context = `\n\nCurrent project files:\n${list.map((p) => `- ${p} (${(currentFiles[p] || "").length} chars)`).join("\n")}\n\nYou may overwrite any of these. Always re-emit any file you change in full.`;
-      }
+      // Include FULL current file contents so the model can match style precisely on iteration.
+      const fileBlocks = list
+        .map((p) => {
+          const content = String(currentFiles[p] ?? "");
+          // Cap each file to keep prompt size reasonable.
+          const truncated = content.length > 8000 ? content.slice(0, 8000) + "\n/* …truncated… */" : content;
+          return `--- ${p} ---\n${truncated}`;
+        })
+        .join("\n\n");
+      context = `\n\nCurrent project files (you are EDITING these — match the aesthetic exactly):\n\n${fileBlocks}\n\nRe-emit any file you change in full. Do not re-emit unchanged files.`;
     }
 
     const KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!KEY) return j({ error: "AI not configured" }, 500);
 
+    const body: Record<string, unknown> = {
+      model: routed.model,
+      stream: true,
+      max_tokens: routed.maxTokens,
+      messages: [{ role: "system", content: SYSTEM + context }, ...messages],
+    };
+    if (routed.reasoning) {
+      body.reasoning = { effort: routed.reasoning };
+    }
+
     const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: routed.model,
-        stream: true,
-        messages: [{ role: "system", content: SYSTEM + context }, ...messages],
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!upstream.ok) {
-      if (upstream.status === 429) return j({ error: "Too fast — pause and retry." }, 429);
+      if (upstream.status === 429) return j({ error: "Rate limited — pause and retry in a few seconds." }, 429);
+      if (upstream.status === 402) return j({ error: "AI credits exhausted on workspace." }, 402);
       const t = await upstream.text();
       console.error("gateway", upstream.status, t);
       return j({ error: "AI gateway error" }, 500);
