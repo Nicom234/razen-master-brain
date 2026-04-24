@@ -249,7 +249,6 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
       {/* Bubble menu — appears when text is selected */}
       <BubbleMenu
         editor={editor}
-        tippyOptions={{ duration: 100, placement: "top" }}
         shouldShow={({ editor, from, to }) => from !== to && !busy && editor.isFocused}
       >
         <div className="flex items-center gap-0.5 rounded-lg border border-border bg-popover shadow-2xl p-1">
