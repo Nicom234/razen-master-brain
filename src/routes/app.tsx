@@ -173,7 +173,14 @@ function AppPage() {
   const openConv = async (id: string) => {
     setConvId(id);
     const { data } = await supabase.from("messages").select("role,content,created_at").eq("conversation_id", id).order("created_at");
-    if (data) setMessages(data.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })));
+    if (data) setMessages(data.map((m) => {
+      const role = m.role as "user" | "assistant";
+      if (role === "assistant") {
+        const { display, sources } = splitSources(m.content);
+        return { role, content: display, sources };
+      }
+      return { role, content: m.content };
+    }));
   };
 
   const deleteConv = async (id: string) => {
