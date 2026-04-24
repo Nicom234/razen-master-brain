@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Sparkles, Wand2, Minimize2, Maximize2, Languages, FileDown, Loader2, Check, X } from "lucide-react";
