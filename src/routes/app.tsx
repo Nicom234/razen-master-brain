@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -19,7 +19,8 @@ export const Route = createFileRoute("/app")({
   component: AppPage,
 });
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Source = { n: number; title: string; url: string; domain: string };
+type Msg = { role: "user" | "assistant"; content: string; sources?: Source[] };
 type Tier = "free" | "pro" | "elite";
 type Mode = "research" | "write" | "plan" | "build";
 type Conv = { id: string; title: string; updated_at: string; preview?: string };
@@ -172,7 +173,14 @@ function AppPage() {
   const openConv = async (id: string) => {
     setConvId(id);
     const { data } = await supabase.from("messages").select("role,content,created_at").eq("conversation_id", id).order("created_at");
-    if (data) setMessages(data.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })));
+    if (data) setMessages(data.map((m) => {
+      const role = m.role as "user" | "assistant";
+      if (role === "assistant") {
+        const { display, sources } = splitSources(m.content);
+        return { role, content: display, sources };
+      }
+      return { role, content: m.content };
+    }));
   };
 
   const deleteConv = async (id: string) => {
@@ -210,10 +218,11 @@ function AppPage() {
     let acc = "";
     const upsert = (delta: string) => {
       acc += delta;
+      const { display, sources } = splitSources(acc);
       setMessages((prev) => {
         const last = prev[prev.length - 1];
-        if (last?.role === "assistant") return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: acc } : m);
-        return [...prev, { role: "assistant", content: acc }];
+        if (last?.role === "assistant") return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: display, sources } : m);
+        return [...prev, { role: "assistant", content: display, sources }];
       });
     };
 
@@ -301,8 +310,9 @@ function AppPage() {
         }
       }
 
-      // Persist assistant message
-      if (cid && acc) {
+      // Persist assistant message (clean version, no source manifest)
+      const cleaned = splitSources(acc).display;
+      if (cid && cleaned) {
         await supabase.from("messages").insert({ conversation_id: cid, user_id: user.id, role: "assistant", content: acc });
         loadConvs(user.id);
       }
@@ -533,8 +543,20 @@ function AppPage() {
                       : "max-w-full"
                     }>
                       {m.role === "assistant" ? (
-                        <div className="prose-chat">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{m.content || "…"}</ReactMarkdown>
+                        <div className="space-y-3">
+                          <div className="prose-chat">
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              rehypePlugins={[rehypeHighlight]}
+                              components={{
+                                p: ({ children }) => <p>{renderCitations(children, m.sources)}</p>,
+                                li: ({ children }) => <li>{renderCitations(children, m.sources)}</li>,
+                              }}
+                            >{m.content || "…"}</ReactMarkdown>
+                          </div>
+                          {m.sources && m.sources.length > 0 && (
+                            <SourceStrip sources={m.sources} />
+                          )}
                         </div>
                       ) : <span className="whitespace-pre-wrap">{m.content}</span>}
                     </div>
@@ -653,6 +675,111 @@ function StatCard({ label, value, sub, icon: Icon }: { label: string; value: str
       </div>
       <div className="mt-2 font-display text-3xl">{value}</div>
       <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>
+    </div>
+  );
+}
+
+function splitSources(raw: string): { display: string; sources: Source[] } {
+  const match = raw.match(/<<<SOURCES>>>([\s\S]*?)<<<END>>>/);
+  if (!match) return { display: raw, sources: [] };
+  let sources: Source[] = [];
+  try {
+    const parsed = JSON.parse(match[1].trim());
+    if (Array.isArray(parsed)) {
+      sources = parsed
+        .filter((s) => s && typeof s.url === "string" && /^https?:\/\//.test(s.url))
+        .map((s, i) => ({
+          n: typeof s.n === "number" ? s.n : i + 1,
+          title: typeof s.title === "string" ? s.title : s.url,
+          url: s.url,
+          domain: typeof s.domain === "string" && s.domain ? s.domain : safeDomain(s.url),
+        }));
+    }
+  } catch {
+    // partial/streaming — ignore until complete
+  }
+  const display = raw.replace(/<<<SOURCES>>>[\s\S]*?<<<END>>>/, "").replace(/\s+$/, "");
+  return { display, sources };
+}
+
+function safeDomain(url: string) {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; }
+}
+
+function renderCitations(children: React.ReactNode, sources?: Source[]): React.ReactNode {
+  if (!sources || sources.length === 0) return children;
+  const map = new Map(sources.map((s) => [s.n, s]));
+  const transform = (node: React.ReactNode): React.ReactNode => {
+    if (typeof node === "string") {
+      const parts: React.ReactNode[] = [];
+      const regex = /\[(\d+)\]/g;
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
+      let key = 0;
+      while ((match = regex.exec(node)) !== null) {
+        if (match.index > lastIndex) parts.push(node.slice(lastIndex, match.index));
+        const n = Number(match[1]);
+        const src = map.get(n);
+        if (src) {
+          parts.push(
+            <a
+              key={`cite-${key++}`}
+              href={src.url}
+              target="_blank"
+              rel="noreferrer"
+              title={`${src.title} — ${src.domain}`}
+              className="ml-0.5 inline-flex items-center justify-center rounded-md bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary no-underline transition hover:bg-primary/20"
+            >
+              {n}
+            </a>,
+          );
+        } else {
+          parts.push(match[0]);
+        }
+        lastIndex = match.index + match[0].length;
+      }
+      if (lastIndex < node.length) parts.push(node.slice(lastIndex));
+      return parts.length ? parts : node;
+    }
+    if (Array.isArray(node)) return node.map((c, i) => <React.Fragment key={i}>{transform(c)}</React.Fragment>);
+    return node;
+  };
+  return transform(children);
+}
+
+function SourceStrip({ sources }: { sources: Source[] }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card/60 p-3">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        Sources · {sources.length}
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {sources.map((s) => (
+          <a
+            key={s.n}
+            href={s.url}
+            target="_blank"
+            rel="noreferrer"
+            className="group flex items-start gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 transition hover:border-primary/40 hover:shadow-soft"
+          >
+            <img
+              src={`https://www.google.com/s2/favicons?domain=${s.domain}&sz=32`}
+              alt=""
+              className="mt-0.5 h-4 w-4 rounded-sm"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="grid h-4 w-4 shrink-0 place-items-center rounded bg-primary/10 text-[9px] font-semibold text-primary">{s.n}</span>
+                <span className="truncate text-[11px] text-muted-foreground">{s.domain}</span>
+              </div>
+              <p className="mt-0.5 line-clamp-2 text-[12px] font-medium text-foreground group-hover:text-primary">
+                {s.title}
+              </p>
+            </div>
+          </a>
+        ))}
+      </div>
     </div>
   );
 }
