@@ -449,6 +449,8 @@ function AppPage() {
             onExitBuild={() => setMode("research")}
             onCreditsChange={setCredits}
           />
+        ) : mode === "write" ? (
+          <WriteWorkspace onCreditsChange={setCredits} />
         ) : (
         <>
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
