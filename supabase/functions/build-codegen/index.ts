@@ -49,6 +49,13 @@ Always emit \`index.html\` first, then split logic into modules. Suggested struc
 - \`store.js\` (optional) — state + localStorage persistence for non-trivial apps.
 - \`ui.js\` (optional) — reusable DOM helpers / component renderers.
 
+# Competitive quality requirements
+- Treat every request like it will be compared against the best AI website builders. Aim for product-grade output, not tutorial-grade output.
+- Start by deciding the product concept, target user, visual direction, core flows, and what makes the experience memorable.
+- Prefer distinctive, opinionated concepts over generic SaaS layouts. The result should feel intentionally designed, conversion-aware, and differentiated.
+- On iteration, preserve what already works and upgrade weak areas surgically instead of regressing to a more primitive scaffold.
+- Before finishing, internally verify that every referenced local file is emitted, every import path resolves, every interactive control has a working handler, and the generated app has no obvious blank, broken, or placeholder states.
+
 Tailwind custom config inline example:
 \`\`\`html
 <script>
@@ -110,12 +117,12 @@ function route(tier: string, msgChars: number, isIteration: boolean): Routed {
   // Single model across all tiers — Gemini 3 Flash Preview. Same engine that powers
   // Google AI Studio's strong code output. Tier only changes credit cost + token budget.
   if (tier === "elite") {
-    return { model: "google/gemini-3-flash-preview", cost: heavy ? 10 : 7, reasoning: null, maxTokens: 16000 };
+    return { model: "google/gemini-3-flash-preview", cost: heavy ? 10 : 7, reasoning: heavy ? "high" : "medium", maxTokens: 18000 };
   }
   if (tier === "pro") {
-    return { model: "google/gemini-3-flash-preview", cost: heavy ? 6 : 4, reasoning: null, maxTokens: 14000 };
+    return { model: "google/gemini-3-flash-preview", cost: heavy ? 6 : 4, reasoning: heavy ? "medium" : "low", maxTokens: 16000 };
   }
-  return { model: "google/gemini-3-flash-preview", cost: heavy ? 4 : 3, reasoning: null, maxTokens: 12000 };
+  return { model: "google/gemini-3-flash-preview", cost: heavy ? 4 : 3, reasoning: heavy ? "low" : null, maxTokens: 14000 };
 }
 
 serve(async (req) => {
