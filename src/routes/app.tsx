@@ -543,8 +543,20 @@ function AppPage() {
                       : "max-w-full"
                     }>
                       {m.role === "assistant" ? (
-                        <div className="prose-chat">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{m.content || "…"}</ReactMarkdown>
+                        <div className="space-y-3">
+                          <div className="prose-chat">
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              rehypePlugins={[rehypeHighlight]}
+                              components={{
+                                p: ({ children }) => <p>{renderCitations(children, m.sources)}</p>,
+                                li: ({ children }) => <li>{renderCitations(children, m.sources)}</li>,
+                              }}
+                            >{m.content || "…"}</ReactMarkdown>
+                          </div>
+                          {m.sources && m.sources.length > 0 && (
+                            <SourceStrip sources={m.sources} />
+                          )}
                         </div>
                       ) : <span className="whitespace-pre-wrap">{m.content}</span>}
                     </div>
