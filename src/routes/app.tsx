@@ -13,6 +13,7 @@ import { stripeEnv } from "@/lib/stripe";
 import { MemoryPanel } from "@/components/MemoryPanel";
 import { BuildWorkspace } from "@/components/build/BuildWorkspace";
 import { WriteWorkspace } from "@/components/write/WriteWorkspace";
+import { PlanWorkspace } from "@/components/plan/PlanWorkspace";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Razen" }, { name: "description", content: "Your AI employee." }] }),
@@ -451,6 +452,8 @@ function AppPage() {
           />
         ) : mode === "write" ? (
           <WriteWorkspace onCreditsChange={setCredits} />
+        ) : mode === "plan" ? (
+          <PlanWorkspace onCreditsChange={setCredits} />
         ) : (
         <>
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
