@@ -19,7 +19,8 @@ export const Route = createFileRoute("/app")({
   component: AppPage,
 });
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Source = { n: number; title: string; url: string; domain: string };
+type Msg = { role: "user" | "assistant"; content: string; sources?: Source[] };
 type Tier = "free" | "pro" | "elite";
 type Mode = "research" | "write" | "plan" | "build";
 type Conv = { id: string; title: string; updated_at: string; preview?: string };
