@@ -58,34 +58,34 @@ function AppPage() {
   // Estimated cost preview (mirrors edge `route()` heuristics).
   // Build mode uses cheaper models via build-codegen and has its own scale.
   const estimatedCost = (() => {
-    const heavy = input.length > 1200 || mode === "plan";
-    const buildHeavy = input.length > 800;
+    const heavy = input.length > 1100 || mode === "plan";
+    const veryHeavy = input.length > 2400 || (mode === "build" && input.length > 1500);
     if (mode === "build") {
-      if (tier === "elite") return buildHeavy ? 6 : 4;
-      if (tier === "pro") return buildHeavy ? 4 : 3;
-      return buildHeavy ? 3 : 2;
+      if (tier === "elite") return veryHeavy ? 12 : heavy ? 10 : 8;
+      if (tier === "pro") return veryHeavy ? 8 : heavy ? 7 : 5;
+      return veryHeavy ? 5 : heavy ? 4 : 3;
     }
     if (tier === "elite") {
-      if (mode === "plan") return heavy ? 14 : 10;
-      if (mode === "write") return heavy ? 10 : 7;
-      return heavy ? 5 : 3;
+      if (mode === "plan") return heavy ? 9 : 7;
+      if (mode === "write") return heavy ? 6 : 5;
+      return heavy ? 4 : 3;
     }
     if (tier === "pro") {
-      if (mode === "plan") return heavy ? 8 : 6;
-      if (mode === "write") return heavy ? 6 : 4;
+      if (mode === "plan") return heavy ? 6 : 5;
+      if (mode === "write") return heavy ? 4 : 3;
       return heavy ? 3 : 2;
     }
-    if (mode === "plan") return 3;
-    if (mode === "write") return 2;
+    if (mode === "plan") return heavy ? 4 : 3;
+    if (mode === "write") return heavy ? 3 : 2;
     return heavy ? 2 : 1;
   })();
 
   const modelLabel = (id: string | null) => {
     if (!id) return "";
-    if (id.startsWith("claude-sonnet")) return "Claude Sonnet 4.5";
-    if (id.startsWith("claude-haiku")) return "Claude Haiku 4.5";
+    if (id.includes("gemini-3-flash")) return "Gemini 3 Flash";
     if (id.includes("flash-lite")) return "Gemini Flash Lite";
     if (id.includes("flash")) return "Gemini Flash";
+    if (id.includes("gpt-5")) return "GPT-5";
     return id;
   };
 
@@ -516,8 +516,8 @@ function AppPage() {
                     <div className="flex items-start gap-4">
                       <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"><Sparkles className="h-5 w-5" /></div>
                       <div className="flex-1">
-                        <div className="font-display text-xl">Unlock Claude Sonnet 4.5</div>
-                        <p className="mt-1 text-sm text-muted-foreground">Pro adds Claude Haiku, file uploads & 400 credits/mo. Elite unlocks Sonnet 4.5 — the best writing & strategy model on Earth — plus long-term memory.</p>
+                        <div className="font-display text-xl">Unlock deeper reasoning & more builds</div>
+                        <p className="mt-1 text-sm text-muted-foreground">Pro adds file uploads and a larger monthly credit pool. Elite gives you higher-depth reasoning, more memory, and more room for serious research, planning, writing, and builds.</p>
                       </div>
                       <Link to="/pricing"><Button className="shrink-0">See plans</Button></Link>
                     </div>
