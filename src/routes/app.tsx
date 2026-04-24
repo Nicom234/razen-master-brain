@@ -678,3 +678,108 @@ function StatCard({ label, value, sub, icon: Icon }: { label: string; value: str
     </div>
   );
 }
+
+function splitSources(raw: string): { display: string; sources: Source[] } {
+  const match = raw.match(/<<<SOURCES>>>([\s\S]*?)<<<END>>>/);
+  if (!match) return { display: raw, sources: [] };
+  let sources: Source[] = [];
+  try {
+    const parsed = JSON.parse(match[1].trim());
+    if (Array.isArray(parsed)) {
+      sources = parsed
+        .filter((s) => s && typeof s.url === "string" && /^https?:\/\//.test(s.url))
+        .map((s, i) => ({
+          n: typeof s.n === "number" ? s.n : i + 1,
+          title: typeof s.title === "string" ? s.title : s.url,
+          url: s.url,
+          domain: typeof s.domain === "string" && s.domain ? s.domain : safeDomain(s.url),
+        }));
+    }
+  } catch {
+    // partial/streaming — ignore until complete
+  }
+  const display = raw.replace(/<<<SOURCES>>>[\s\S]*?<<<END>>>/, "").replace(/\s+$/, "");
+  return { display, sources };
+}
+
+function safeDomain(url: string) {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; }
+}
+
+function renderCitations(children: React.ReactNode, sources?: Source[]): React.ReactNode {
+  if (!sources || sources.length === 0) return children;
+  const map = new Map(sources.map((s) => [s.n, s]));
+  const transform = (node: React.ReactNode): React.ReactNode => {
+    if (typeof node === "string") {
+      const parts: React.ReactNode[] = [];
+      const regex = /\[(\d+)\]/g;
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
+      let key = 0;
+      while ((match = regex.exec(node)) !== null) {
+        if (match.index > lastIndex) parts.push(node.slice(lastIndex, match.index));
+        const n = Number(match[1]);
+        const src = map.get(n);
+        if (src) {
+          parts.push(
+            <a
+              key={`cite-${key++}`}
+              href={src.url}
+              target="_blank"
+              rel="noreferrer"
+              title={`${src.title} — ${src.domain}`}
+              className="ml-0.5 inline-flex items-center justify-center rounded-md bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary no-underline transition hover:bg-primary/20"
+            >
+              {n}
+            </a>,
+          );
+        } else {
+          parts.push(match[0]);
+        }
+        lastIndex = match.index + match[0].length;
+      }
+      if (lastIndex < node.length) parts.push(node.slice(lastIndex));
+      return parts.length ? parts : node;
+    }
+    if (Array.isArray(node)) return node.map((c, i) => <React.Fragment key={i}>{transform(c)}</React.Fragment>);
+    return node;
+  };
+  return transform(children);
+}
+
+function SourceStrip({ sources }: { sources: Source[] }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card/60 p-3">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        Sources · {sources.length}
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {sources.map((s) => (
+          <a
+            key={s.n}
+            href={s.url}
+            target="_blank"
+            rel="noreferrer"
+            className="group flex items-start gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 transition hover:border-primary/40 hover:shadow-soft"
+          >
+            <img
+              src={`https://www.google.com/s2/favicons?domain=${s.domain}&sz=32`}
+              alt=""
+              className="mt-0.5 h-4 w-4 rounded-sm"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="grid h-4 w-4 shrink-0 place-items-center rounded bg-primary/10 text-[9px] font-semibold text-primary">{s.n}</span>
+                <span className="truncate text-[11px] text-muted-foreground">{s.domain}</span>
+              </div>
+              <p className="mt-0.5 line-clamp-2 text-[12px] font-medium text-foreground group-hover:text-primary">
+                {s.title}
+              </p>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
