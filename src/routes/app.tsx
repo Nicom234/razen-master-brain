@@ -303,8 +303,9 @@ function AppPage() {
         }
       }
 
-      // Persist assistant message
-      if (cid && acc) {
+      // Persist assistant message (clean version, no source manifest)
+      const cleaned = splitSources(acc).display;
+      if (cid && cleaned) {
         await supabase.from("messages").insert({ conversation_id: cid, user_id: user.id, role: "assistant", content: acc });
         loadConvs(user.id);
       }
