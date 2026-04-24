@@ -211,10 +211,11 @@ function AppPage() {
     let acc = "";
     const upsert = (delta: string) => {
       acc += delta;
+      const { display, sources } = splitSources(acc);
       setMessages((prev) => {
         const last = prev[prev.length - 1];
-        if (last?.role === "assistant") return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: acc } : m);
-        return [...prev, { role: "assistant", content: acc }];
+        if (last?.role === "assistant") return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: display, sources } : m);
+        return [...prev, { role: "assistant", content: display, sources }];
       });
     };
 
