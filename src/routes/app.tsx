@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { stripeEnv } from "@/lib/stripe";
 import { MemoryPanel } from "@/components/MemoryPanel";
 import { BuildWorkspace } from "@/components/build/BuildWorkspace";
+import { WriteWorkspace } from "@/components/write/WriteWorkspace";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Razen" }, { name: "description", content: "Your AI employee." }] }),
@@ -448,6 +449,8 @@ function AppPage() {
             onExitBuild={() => setMode("research")}
             onCreditsChange={setCredits}
           />
+        ) : mode === "write" ? (
+          <WriteWorkspace onCreditsChange={setCredits} />
         ) : (
         <>
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
