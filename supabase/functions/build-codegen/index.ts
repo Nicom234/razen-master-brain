@@ -188,7 +188,7 @@ serve(async (req) => {
     const last = messages[messages.length - 1];
     const lastText = typeof last?.content === "string" ? last.content : "";
     const hasFiles = currentFiles && typeof currentFiles === "object" && Object.keys(currentFiles).length > 0;
-    const routed = route(tier, lastText.length, hasFiles);
+    const routed = route(tier, lastText, hasFiles);
 
     const { data: newBal, error: dErr } = await admin.rpc("deduct_credit", { _user_id: user.id, _cost: routed.cost });
     if (dErr) return j({ error: "Credit check failed" }, 500);
