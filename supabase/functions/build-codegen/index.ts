@@ -125,17 +125,46 @@ DO NOT write any prose, explanation, or commentary outside these tags. Plan tag 
 
 interface Routed { model: string; cost: number; reasoning: "low" | "medium" | "high" | null; maxTokens: number; }
 
-function route(tier: string, msgChars: number, isIteration: boolean): Routed {
-  const heavy = msgChars > 600 || isIteration;
-  // Single model across all tiers — Gemini 3 Flash Preview. Same engine that powers
-  // Google AI Studio's strong code output. Tier only changes credit cost + token budget.
-  if (tier === "elite") {
-    return { model: "google/gemini-3-flash-preview", cost: heavy ? 10 : 7, reasoning: heavy ? "high" : "medium", maxTokens: 18000 };
-  }
-  if (tier === "pro") {
-    return { model: "google/gemini-3-flash-preview", cost: heavy ? 6 : 4, reasoning: heavy ? "medium" : "low", maxTokens: 16000 };
-  }
-  return { model: "google/gemini-3-flash-preview", cost: heavy ? 4 : 3, reasoning: heavy ? "low" : null, maxTokens: 14000 };
+// Estimate complexity from prompt + context. Bigger / more ambitious requests get
+// higher reasoning effort and bigger token budgets so the model can actually
+// produce exquisite multi-file output instead of rushing.
+function complexity(text: string, isIteration: boolean): "small" | "medium" | "large" | "xl" {
+  const t = text.toLowerCase();
+  const len = text.length;
+  // Strong signals of an ambitious build
+  const heavyKeywords = /(dashboard|admin|saas|landing page|portfolio|e-?commerce|store|marketplace|analytics|chart|three\.?js|3d|animation|game|editor|kanban|crm|cms|blog|booking|calendar|chat|social|streaming|video|map)/;
+  const sectionKeywords = /(hero|pricing|testimonials|faq|footer|nav|sidebar|modal|drawer|tabs|carousel|gallery|grid|table|timeline|stepper|wizard)/;
+  const heavyHits = (t.match(heavyKeywords) || []).length;
+  const sectionHits = (t.match(sectionKeywords) || []).length;
+  const score = (len / 200) + heavyHits * 2 + sectionHits + (isIteration ? 1 : 0);
+  if (score >= 9) return "xl";
+  if (score >= 5) return "large";
+  if (score >= 2) return "medium";
+  return "small";
+}
+
+function route(tier: string, lastText: string, isIteration: boolean): Routed {
+  const c = complexity(lastText, isIteration);
+  // Cost + reasoning + token budget scale with complexity AND tier.
+  // Elite tier gets premium budgets so output is genuinely exquisite.
+  const base = {
+    small:  { cost: 2, reasoning: "low" as const,    tokens: 12000 },
+    medium: { cost: 4, reasoning: "medium" as const, tokens: 16000 },
+    large:  { cost: 7, reasoning: "high" as const,   tokens: 22000 },
+    xl:     { cost: 10, reasoning: "high" as const,  tokens: 28000 },
+  }[c];
+
+  let costMult = 1;
+  let tokenBoost = 0;
+  if (tier === "elite") { costMult = 1.4; tokenBoost = 6000; }
+  else if (tier === "pro") { costMult = 1.2; tokenBoost = 3000; }
+
+  return {
+    model: "google/gemini-3-flash-preview",
+    cost: Math.round(base.cost * costMult),
+    reasoning: base.reasoning,
+    maxTokens: base.tokens + tokenBoost,
+  };
 }
 
 serve(async (req) => {
