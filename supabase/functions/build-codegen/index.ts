@@ -97,6 +97,33 @@ document.addEventListener('DOMContentLoaded', () => {
 function handleAction(e) { /* ... */ }
 \`\`\`
 
+# WIRING CONTRACT (mandatory — this is what makes the app feel real)
+Every interactive element must resolve to one of these concrete behaviors. Pick the appropriate one — never leave it dead.
+
+**Primary CTAs ("Get started", "Try it free", "Book a demo")** → open a real signup/booking MODAL with a working form (name + email + password OR name + email + date). On submit: validate (regex for email, min length for password), show inline errors under fields, on success show a success state inside the modal ("Check your inbox, name@x.com — we sent a magic link") and persist to \`localStorage\` under a namespaced key (e.g. \`appname:signups\`). Modal closes on backdrop click, Escape key, and X button.
+
+**"Sign in" / "Log in"** → open a sign-in MODAL with email + password fields, "Forgot password?" link that swaps the modal body to a reset form, and "Don't have an account? Sign up" link that swaps to the signup form. All three states share one modal shell.
+
+**"Sign up" / "Create account"** → real multi-field form inside a modal (or dedicated section). Validate every field. On success store the user object in localStorage and update the header (replace "Sign in / Sign up" with an avatar + name + "Log out" button that actually logs out).
+
+**Nav links (Features, Pricing, About, Docs, Blog, Contact)** → either (a) smooth-scroll to a real section with that id on the same page using \`element.scrollIntoView({ behavior: 'smooth' })\`, OR (b) swap the main content area to a different "page" using a tiny client-side router (hash-based: \`window.addEventListener('hashchange', render)\`). Pick (a) for landing pages, (b) for app shells. Either way the destination must EXIST and have real content.
+
+**Dropdowns / menus** → toggle open/closed on click, close on outside click (\`document.addEventListener('click', e => { if (!menu.contains(e.target)) close(); })\`), close on Escape, and every menu item must trigger a real action (filter the list, change the sort, open a modal, etc).
+
+**Footer links (Privacy, Terms, Contact, Careers, Status)** → each one opens a modal with real (placeholder-but-believable) content for that policy/page. NEVER \`href="#"\`. NEVER 404.
+
+**Search inputs** → filter visible items live as the user types (\`input\` event, case-insensitive \`includes\`). Show "No results for 'X'" empty state when filtered list is empty.
+
+**"Add to cart" / "Save" / "Like" / "Subscribe"** → mutate local state, persist to localStorage, update a visible counter/badge in the header, and show a non-blocking toast confirmation (build a tiny toast helper — \`function toast(msg) { ... }\` — that creates a div, fades in, removes after 2.5s).
+
+**Theme toggle** → toggle a \`dark\` class on \`<html>\`, persist to localStorage, read on load. Tailwind \`dark:\` variants must already be in the markup.
+
+**Tabs** → clicking a tab updates an \`active\` state, shows the matching panel, hides others, and updates URL hash so it's shareable.
+
+**Forms (contact, newsletter, feedback)** → \`e.preventDefault()\`, validate (required + email regex), show field-level errors, on success replace the form with a success card ("Thanks Name — we'll get back to you within 24 hours"). Persist submissions to localStorage so the user can see them in a "Submitted" panel if relevant.
+
+**Empty states** → if a list/grid would be empty (no signups yet, no items in cart, no search results), render a real empty state with an icon, headline, and CTA — never just blank space.
+
 # Critical rules so output actually runs
 - **No template literals containing backticks inside <script> tags in the HTML** — use external main.js instead. (HTML parser breaks inside script tags is a real footgun; keep complex JS in .js files.)
 - Every \`addEventListener\` callback must reference a function that exists in the same file or is defined before use.
@@ -104,6 +131,7 @@ function handleAction(e) { /* ... */ }
 - Always call \`lucide.createIcons()\` after dynamically inserting icons into the DOM.
 - For forms, always \`e.preventDefault()\` then handle locally (toast / state update / localStorage).
 - Always provide initial seed data so the page isn't empty on first load.
+- **Modal helper required** for any non-trivial app: write a single \`openModal(html)\` / \`closeModal()\` pair that handles backdrop, Escape, focus trap. Reuse it for signup, signin, footer policies, etc — don't duplicate modal code.
 
 # Iteration mode
 When the user sends a follow-up and \`Current project files\` is provided, you are EDITING the existing project. **Re-emit ONLY the files you change** (in full content), keep the rest. Match the existing aesthetic exactly — same fonts, same color palette, same component style.
