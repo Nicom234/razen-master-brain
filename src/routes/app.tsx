@@ -491,6 +491,8 @@ function AppPage() {
           <WriteWorkspace onCreditsChange={setCredits} />
         ) : mode === "plan" ? (
           <PlanWorkspace onCreditsChange={setCredits} />
+        ) : mode === "research" ? (
+          <ResearchLab onCreditsChange={setCredits} onExitResearch={() => setMode("write")} />
         ) : (
         <>
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
