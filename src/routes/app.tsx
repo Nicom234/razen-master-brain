@@ -13,6 +13,7 @@ import { stripeEnv } from "@/lib/stripe";
 import { MemoryPanel } from "@/components/MemoryPanel";
 import { WriteWorkspace } from "@/components/write/WriteWorkspace";
 import { PlanWorkspace } from "@/components/plan/PlanWorkspace";
+import { ResearchLab } from "@/components/research/ResearchLab";
 
 type BuildWorkspaceProps = {
   tier: "free" | "pro" | "elite";
@@ -490,6 +491,8 @@ function AppPage() {
           <WriteWorkspace onCreditsChange={setCredits} />
         ) : mode === "plan" ? (
           <PlanWorkspace onCreditsChange={setCredits} />
+        ) : mode === "research" ? (
+          <ResearchLab onCreditsChange={setCredits} onExitResearch={() => setMode("write")} />
         ) : (
         <>
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
