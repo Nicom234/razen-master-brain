@@ -388,12 +388,13 @@ Rules:
 
   const exportReport = () => {
     if (!active?.report) return;
-    const blob = new Blob([
+    const md = [
       `# ${active.query}\n\n_Investigated at ${DEPTH_LABELS[active.depth].label} depth · ${new Date(active.updatedAt).toLocaleString()}_\n\n`,
       active.report,
       "\n\n## Sources\n\n",
       allSources.map((s, i) => `${i + 1}. [${s.title}](${s.url})`).join("\n"),
-    ].join(""), { type: "text/markdown" });
+    ].join("");
+    const blob = new Blob([md], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = `${active.query.slice(0, 60).replace(/[^a-z0-9]+/gi, "-")}.md`;
