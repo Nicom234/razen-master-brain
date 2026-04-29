@@ -552,7 +552,7 @@ Rules:
         {/* Composer */}
         <div className="border-t border-border/60 bg-card/30 p-3">
           <div className="mx-auto max-w-4xl">
-            <div className="mb-2 flex items-center gap-2 text-[11px]">
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px]">
               <span className="font-semibold uppercase tracking-wider text-muted-foreground">Depth</span>
               <input
                 type="range" min={1} max={5} value={depth}
@@ -561,31 +561,49 @@ Rules:
                 disabled={phase !== "idle"}
               />
               <span className="font-medium">{DEPTH_LABELS[depth].label}</span>
-              <span className="text-muted-foreground">· {DEPTH_LABELS[depth].subs} · {DEPTH_LABELS[depth].tokens}</span>
-              <span className="ml-auto text-muted-foreground">{phase === "idle" ? "Ready" : phase === "planning" ? "Planning…" : phase === "investigating" ? "Investigating in parallel…" : "Synthesizing report…"}</span>
+              <span className="text-muted-foreground">· {DEPTH_LABELS[depth].subs}</span>
+              {input.trim().length > 5 && phase === "idle" && (
+                <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+                  Auto-route: <span className="font-semibold text-foreground">{classifyQuery(input) === "quick" ? "Quick answer" : "Full Lab"}</span>
+                </span>
+              )}
+              {tier !== "elite" && depth >= 4 && (
+                <Link to="/pricing" className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                  <Crown className="h-2.5 w-2.5" /> Elite gives this depth real teeth
+                </Link>
+              )}
+              <span className="ml-auto text-muted-foreground">
+                {phase === "idle" ? "Ready" :
+                 phase === "quick" ? "Answering…" :
+                 phase === "planning" ? "Planning…" :
+                 phase === "investigating" ? "Investigating in parallel…" :
+                 phase === "synthesizing" ? "Synthesizing report…" : "Working…"}
+              </span>
             </div>
             <div className="relative rounded-2xl border border-border bg-background shadow-sm focus-within:border-primary/50">
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask anything — e.g. ‘What are the realistic paths to AGI by 2030 according to the labs that publish technical roadmaps?’"
-                className="min-h-[80px] resize-none border-0 bg-transparent pr-32 focus-visible:ring-0"
-                onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void runFullPipeline(); } }}
+                placeholder="Ask anything — quick advice, a focused question, or a deep brief. The Lab routes automatically."
+                className="min-h-[80px] resize-none border-0 bg-transparent pr-44 focus-visible:ring-0"
+                onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void runAuto(); } }}
                 disabled={phase !== "idle"}
               />
               <div className="absolute bottom-2 right-2 flex gap-1.5">
-                <Button size="sm" variant="ghost" disabled={phase !== "idle" || !input.trim()} onClick={runPlanning} title="Just plan">
-                  <ListChecks className="h-3.5 w-3.5 mr-1" /> Plan
+                <Button size="sm" variant="ghost" disabled={phase !== "idle" || !input.trim()} onClick={runQuick} title="Force quick answer">
+                  <MessageSquare className="h-3.5 w-3.5 mr-1" /> Quick
                 </Button>
-                <Button size="sm" variant="ghost" disabled={phase !== "idle" || !active?.subs.length} onClick={runInvestigation} title="Run investigation">
-                  <Search className="h-3.5 w-3.5 mr-1" /> Investigate
+                <Button size="sm" variant="ghost" disabled={phase !== "idle" || !input.trim()} onClick={runFullPipeline} title="Force full Lab">
+                  <Beaker className="h-3.5 w-3.5 mr-1" /> Full Lab
                 </Button>
-                <Button size="sm" disabled={phase !== "idle" || !input.trim()} onClick={runFullPipeline} title="Run the whole pipeline">
-                  {phase !== "idle" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Zap className="h-3.5 w-3.5 mr-1" /> Run Lab</>}
+                <Button size="sm" disabled={phase !== "idle" || !input.trim()} onClick={runAuto} title="Auto-pick">
+                  {phase !== "idle" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Zap className="h-3.5 w-3.5 mr-1" /> Run</>}
                 </Button>
               </div>
             </div>
-            <div className="mt-1.5 text-[10px] text-muted-foreground">⌘/Ctrl+Enter to run · Plan → Investigate → Synthesize</div>
+            <div className="mt-1.5 text-[10px] text-muted-foreground">
+              ⌘/Ctrl+Enter to run · <span className="font-medium">Run</span> auto-picks · <span className="font-medium">Quick</span> for advice · <span className="font-medium">Full Lab</span> for deep research
+            </div>
           </div>
         </div>
       </div>
