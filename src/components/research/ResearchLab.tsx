@@ -17,10 +17,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUp, BookOpen, Beaker, Brain, Check, ChevronDown, ChevronRight,
   Download, FileText, Globe, Layers, Loader2, Plus, RefreshCw, Search,
-  Sparkles, Trash2, Zap, AlertCircle, ListChecks, Quote,
+  Sparkles, Trash2, Zap, AlertCircle, ListChecks, Quote, MessageSquare, Crown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -56,6 +57,9 @@ type Investigation = {
   subs: SubQuestion[];
   report?: string;
   notes: string;
+  quickAnswer?: string;       // direct answer for non-research-grade questions
+  quickSources?: Source[];    // sources for the quick answer
+  isQuick?: boolean;          // marks this as a quick answer (not full lab)
 };
 
 const DEPTH_LABELS: Record<Depth, { label: string; subs: string; tokens: string; tone: string }> = {
@@ -67,10 +71,28 @@ const DEPTH_LABELS: Record<Depth, { label: string; subs: string; tokens: string;
 };
 const DEPTH_TARGETS: Record<Depth, number> = { 1: 3, 2: 5, 3: 6, 4: 7, 5: 8 };
 
+// Heuristic triage: is this a research question or a conversational/advice question?
+// Quick answer = personal, advice-seeking, opinion, short factual, conversational.
+// Lab = comparative analysis, "what is the landscape", "how do X think about Y", multi-source.
+function classifyQuery(q: string): "quick" | "lab" {
+  const t = q.trim().toLowerCase();
+  if (t.length < 30) return "quick";
+  // Conversational / advice / personal pronouns
+  if (/^(should i|can i|how do i|what should i|help me|tell me|give me|recommend|suggest|advice|what'?s the best)/.test(t)) return "quick";
+  if (/\b(my|i'm|i am|i've|for me|for my)\b/.test(t)) return "quick";
+  // Lab signals: compare, analyse, landscape, evidence, sources, deep
+  if (/\b(compare|landscape|analy[sz]e|evidence|sources?|state of|literature|systematic|meta[- ]analysis|deep dive|investigate|across|trends?|what do experts|what does the research|cited)\b/.test(t)) return "lab";
+  // Question opener that suggests research
+  if (/^(what are the|why does|why do|why is|how does|how do|to what extent|under what conditions)/.test(t)) return "lab";
+  return "quick";
+}
+
 interface ResearchLabProps {
   onCreditsChange: (credits: number | null) => void;
   onExitResearch: () => void;
+  tier?: "free" | "pro" | "elite";
 }
+
 
 // ---------- persistence ----------
 function loadStore(): Record<string, Investigation> {
@@ -188,7 +210,7 @@ function fmtElapsed(ms: number): string {
   return `${m}m ${s}s`;
 }
 
-export function ResearchLab({ onCreditsChange, onExitResearch }: ResearchLabProps) {
+export function ResearchLab({ onCreditsChange, onExitResearch, tier = "free" }: ResearchLabProps) {
   const [store, setStore] = useState<Record<string, Investigation>>(() => loadStore());
   const [activeId, setActiveId] = useState<string | null>(() => {
     const s = loadStore();
@@ -197,7 +219,7 @@ export function ResearchLab({ onCreditsChange, onExitResearch }: ResearchLabProp
   });
   const [input, setInput] = useState("");
   const [depth, setDepth] = useState<Depth>(3);
-  const [phase, setPhase] = useState<"idle" | "planning" | "investigating" | "synthesizing">("idle");
+  const [phase, setPhase] = useState<"idle" | "triage" | "quick" | "planning" | "investigating" | "synthesizing">("idle");
   const [now, setNow] = useState(Date.now());
   const [tab, setTab] = useState<"plan" | "subs" | "sources" | "report" | "notes">("plan");
   const reportRef = useRef<HTMLDivElement>(null);
@@ -386,6 +408,48 @@ Rules:
     }, 300);
   };
 
+  // Quick answer — for advice / conversational / narrow factual questions.
+  // No planning, no sub-questions, no synthesis. Just a direct, well-cited reply.
+  const runQuick = async () => {
+    if (!active || !input.trim()) return;
+    const query = input.trim();
+    setPhase("quick"); setTab("report");
+    updateActive((i) => ({
+      ...i, query, isQuick: true,
+      plan: undefined, subs: [], report: undefined,
+      quickAnswer: "", quickSources: [],
+    }));
+    const sys = `You are Razen Research — Quick Answer mode. The user asked a focused question that doesn't need a full multi-source investigation. Give a direct, opinionated, useful answer.
+
+Rules:
+- Lead with the answer in the first 1-2 sentences. No preamble.
+- 200-500 words. Use markdown — short paragraphs, bullets where helpful, **bold** for the key claim.
+- If the question is advice / personal, give specific, actionable guidance. Don't ask clarifying questions unless absolutely necessary — make a smart default assumption and call it out.
+- If it's factual, cite sources inline as [Title](url) markdown links — but only when you actually used them.
+- End with one short "If you want to go deeper:" line suggesting what a full Lab investigation could uncover (only if relevant).
+- No "as an AI" disclaimers. No mealy-mouthed hedging. Be useful.`;
+    try {
+      const { content, credits } = await callChat(
+        [{ role: "system", content: sys }, { role: "user", content: query }],
+        true,
+      );
+      if (credits !== null) onCreditsChange(credits);
+      const sources = extractSources(content, "quick");
+      updateActive((i) => ({ ...i, quickAnswer: content, quickSources: sources }));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Quick answer failed");
+    } finally { setPhase("idle"); }
+  };
+
+  // Smart auto-route: classify the query and pick the right pipeline.
+  const runAuto = async () => {
+    if (!input.trim()) return;
+    const kind = classifyQuery(input);
+    if (kind === "quick") await runQuick();
+    else await runFullPipeline();
+  };
+
+
   const exportReport = () => {
     if (!active?.report) return;
     const md = [
@@ -488,7 +552,7 @@ Rules:
         {/* Composer */}
         <div className="border-t border-border/60 bg-card/30 p-3">
           <div className="mx-auto max-w-4xl">
-            <div className="mb-2 flex items-center gap-2 text-[11px]">
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px]">
               <span className="font-semibold uppercase tracking-wider text-muted-foreground">Depth</span>
               <input
                 type="range" min={1} max={5} value={depth}
@@ -497,31 +561,49 @@ Rules:
                 disabled={phase !== "idle"}
               />
               <span className="font-medium">{DEPTH_LABELS[depth].label}</span>
-              <span className="text-muted-foreground">· {DEPTH_LABELS[depth].subs} · {DEPTH_LABELS[depth].tokens}</span>
-              <span className="ml-auto text-muted-foreground">{phase === "idle" ? "Ready" : phase === "planning" ? "Planning…" : phase === "investigating" ? "Investigating in parallel…" : "Synthesizing report…"}</span>
+              <span className="text-muted-foreground">· {DEPTH_LABELS[depth].subs}</span>
+              {input.trim().length > 5 && phase === "idle" && (
+                <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+                  Auto-route: <span className="font-semibold text-foreground">{classifyQuery(input) === "quick" ? "Quick answer" : "Full Lab"}</span>
+                </span>
+              )}
+              {tier !== "elite" && depth >= 4 && (
+                <Link to="/pricing" className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                  <Crown className="h-2.5 w-2.5" /> Elite gives this depth real teeth
+                </Link>
+              )}
+              <span className="ml-auto text-muted-foreground">
+                {phase === "idle" ? "Ready" :
+                 phase === "quick" ? "Answering…" :
+                 phase === "planning" ? "Planning…" :
+                 phase === "investigating" ? "Investigating in parallel…" :
+                 phase === "synthesizing" ? "Synthesizing report…" : "Working…"}
+              </span>
             </div>
             <div className="relative rounded-2xl border border-border bg-background shadow-sm focus-within:border-primary/50">
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask anything — e.g. ‘What are the realistic paths to AGI by 2030 according to the labs that publish technical roadmaps?’"
-                className="min-h-[80px] resize-none border-0 bg-transparent pr-32 focus-visible:ring-0"
-                onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void runFullPipeline(); } }}
+                placeholder="Ask anything — quick advice, a focused question, or a deep brief. The Lab routes automatically."
+                className="min-h-[80px] resize-none border-0 bg-transparent pr-44 focus-visible:ring-0"
+                onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void runAuto(); } }}
                 disabled={phase !== "idle"}
               />
               <div className="absolute bottom-2 right-2 flex gap-1.5">
-                <Button size="sm" variant="ghost" disabled={phase !== "idle" || !input.trim()} onClick={runPlanning} title="Just plan">
-                  <ListChecks className="h-3.5 w-3.5 mr-1" /> Plan
+                <Button size="sm" variant="ghost" disabled={phase !== "idle" || !input.trim()} onClick={runQuick} title="Force quick answer">
+                  <MessageSquare className="h-3.5 w-3.5 mr-1" /> Quick
                 </Button>
-                <Button size="sm" variant="ghost" disabled={phase !== "idle" || !active?.subs.length} onClick={runInvestigation} title="Run investigation">
-                  <Search className="h-3.5 w-3.5 mr-1" /> Investigate
+                <Button size="sm" variant="ghost" disabled={phase !== "idle" || !input.trim()} onClick={runFullPipeline} title="Force full Lab">
+                  <Beaker className="h-3.5 w-3.5 mr-1" /> Full Lab
                 </Button>
-                <Button size="sm" disabled={phase !== "idle" || !input.trim()} onClick={runFullPipeline} title="Run the whole pipeline">
-                  {phase !== "idle" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Zap className="h-3.5 w-3.5 mr-1" /> Run Lab</>}
+                <Button size="sm" disabled={phase !== "idle" || !input.trim()} onClick={runAuto} title="Auto-pick">
+                  {phase !== "idle" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Zap className="h-3.5 w-3.5 mr-1" /> Run</>}
                 </Button>
               </div>
             </div>
-            <div className="mt-1.5 text-[10px] text-muted-foreground">⌘/Ctrl+Enter to run · Plan → Investigate → Synthesize</div>
+            <div className="mt-1.5 text-[10px] text-muted-foreground">
+              ⌘/Ctrl+Enter to run · <span className="font-medium">Run</span> auto-picks · <span className="font-medium">Quick</span> for advice · <span className="font-medium">Full Lab</span> for deep research
+            </div>
           </div>
         </div>
       </div>
@@ -692,13 +774,37 @@ function SourcesTab({ sources, subs }: { sources: Source[]; subs: SubQuestion[] 
 }
 
 function ReportTab({ active, onExport }: { active: Investigation | null; onExport: () => void }) {
+  // Quick-answer view
+  if (active?.isQuick && (active.quickAnswer || !active.report)) {
+    if (!active.quickAnswer) {
+      return (
+        <div className="flex h-full items-center justify-center p-8 text-center">
+          <div className="max-w-md">
+            <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary/60" />
+            <h3 className="font-display text-lg">Answering…</h3>
+            <p className="mt-2 text-sm text-muted-foreground">Quick answer mode — no sub-questions, just a direct, useful response.</p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="mx-auto max-w-3xl p-6">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Quick answer</span>
+          <span className="text-xs text-muted-foreground">Need depth? Hit <strong>Full Lab</strong> below.</span>
+        </div>
+        <h2 className="font-display text-2xl tracking-tight">{active.query}</h2>
+        <article className="prose prose-sm dark:prose-invert mt-4 max-w-none whitespace-pre-wrap leading-relaxed">{active.quickAnswer}</article>
+      </div>
+    );
+  }
   if (!active?.report) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-center">
         <div className="max-w-md">
           <BookOpen className="mx-auto mb-4 h-10 w-10 text-primary/60" />
           <h3 className="font-display text-lg">No report yet</h3>
-          <p className="mt-2 text-sm text-muted-foreground">Run the investigation, then synthesis will produce a long-form analyst memo with inline citations.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Run an investigation. For quick advice or focused questions use <strong>Quick</strong> — for deep multi-source briefs use <strong>Full Lab</strong>.</p>
         </div>
       </div>
     );
