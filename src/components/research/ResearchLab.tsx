@@ -408,6 +408,48 @@ Rules:
     }, 300);
   };
 
+  // Quick answer — for advice / conversational / narrow factual questions.
+  // No planning, no sub-questions, no synthesis. Just a direct, well-cited reply.
+  const runQuick = async () => {
+    if (!active || !input.trim()) return;
+    const query = input.trim();
+    setPhase("quick"); setTab("report");
+    updateActive((i) => ({
+      ...i, query, isQuick: true,
+      plan: undefined, subs: [], report: undefined,
+      quickAnswer: "", quickSources: [],
+    }));
+    const sys = `You are Razen Research — Quick Answer mode. The user asked a focused question that doesn't need a full multi-source investigation. Give a direct, opinionated, useful answer.
+
+Rules:
+- Lead with the answer in the first 1-2 sentences. No preamble.
+- 200-500 words. Use markdown — short paragraphs, bullets where helpful, **bold** for the key claim.
+- If the question is advice / personal, give specific, actionable guidance. Don't ask clarifying questions unless absolutely necessary — make a smart default assumption and call it out.
+- If it's factual, cite sources inline as [Title](url) markdown links — but only when you actually used them.
+- End with one short "If you want to go deeper:" line suggesting what a full Lab investigation could uncover (only if relevant).
+- No "as an AI" disclaimers. No mealy-mouthed hedging. Be useful.`;
+    try {
+      const { content, credits } = await callChat(
+        [{ role: "system", content: sys }, { role: "user", content: query }],
+        true,
+      );
+      if (credits !== null) onCreditsChange(credits);
+      const sources = extractSources(content, "quick");
+      updateActive((i) => ({ ...i, quickAnswer: content, quickSources: sources }));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Quick answer failed");
+    } finally { setPhase("idle"); }
+  };
+
+  // Smart auto-route: classify the query and pick the right pipeline.
+  const runAuto = async () => {
+    if (!input.trim()) return;
+    const kind = classifyQuery(input);
+    if (kind === "quick") await runQuick();
+    else await runFullPipeline();
+  };
+
+
   const exportReport = () => {
     if (!active?.report) return;
     const md = [
