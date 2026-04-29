@@ -57,6 +57,9 @@ type Investigation = {
   subs: SubQuestion[];
   report?: string;
   notes: string;
+  quickAnswer?: string;       // direct answer for non-research-grade questions
+  quickSources?: Source[];    // sources for the quick answer
+  isQuick?: boolean;          // marks this as a quick answer (not full lab)
 };
 
 const DEPTH_LABELS: Record<Depth, { label: string; subs: string; tokens: string; tone: string }> = {
@@ -68,10 +71,28 @@ const DEPTH_LABELS: Record<Depth, { label: string; subs: string; tokens: string;
 };
 const DEPTH_TARGETS: Record<Depth, number> = { 1: 3, 2: 5, 3: 6, 4: 7, 5: 8 };
 
+// Heuristic triage: is this a research question or a conversational/advice question?
+// Quick answer = personal, advice-seeking, opinion, short factual, conversational.
+// Lab = comparative analysis, "what is the landscape", "how do X think about Y", multi-source.
+function classifyQuery(q: string): "quick" | "lab" {
+  const t = q.trim().toLowerCase();
+  if (t.length < 30) return "quick";
+  // Conversational / advice / personal pronouns
+  if (/^(should i|can i|how do i|what should i|help me|tell me|give me|recommend|suggest|advice|what'?s the best)/.test(t)) return "quick";
+  if (/\b(my|i'm|i am|i've|for me|for my)\b/.test(t)) return "quick";
+  // Lab signals: compare, analyse, landscape, evidence, sources, deep
+  if (/\b(compare|landscape|analy[sz]e|evidence|sources?|state of|literature|systematic|meta[- ]analysis|deep dive|investigate|across|trends?|what do experts|what does the research|cited)\b/.test(t)) return "lab";
+  // Question opener that suggests research
+  if (/^(what are the|why does|why do|why is|how does|how do|to what extent|under what conditions)/.test(t)) return "lab";
+  return "quick";
+}
+
 interface ResearchLabProps {
   onCreditsChange: (credits: number | null) => void;
   onExitResearch: () => void;
+  tier?: "free" | "pro" | "elite";
 }
+
 
 // ---------- persistence ----------
 function loadStore(): Record<string, Investigation> {
