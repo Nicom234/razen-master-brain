@@ -447,7 +447,7 @@ function AppPage() {
         </header>
 
         {mode === "build" ? (
-          <BuildWorkspaceResolved
+          <BuildWorkspaceSafe
             tier={tier}
             onExitBuild={() => setMode("research")}
             onCreditsChange={setCredits}
