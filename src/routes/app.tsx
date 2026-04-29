@@ -14,42 +14,7 @@ import { MemoryPanel } from "@/components/MemoryPanel";
 import { WriteWorkspace } from "@/components/write/WriteWorkspace";
 import { PlanWorkspace } from "@/components/plan/PlanWorkspace";
 import { ResearchLab } from "@/components/research/ResearchLab";
-
-type BuildWorkspaceProps = {
-  tier: "free" | "pro" | "elite";
-  onExitBuild: () => void;
-  onCreditsChange: (credits: number | null) => void;
-};
-
-function BuildWorkspaceFallback({ onExitBuild }: BuildWorkspaceProps) {
-  return (
-    <div className="flex flex-1 items-center justify-center px-6 py-10">
-      <div className="w-full max-w-2xl rounded-xl border bg-card p-8 text-center shadow-sm">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-          <Code2 className="h-6 w-6 text-primary" />
-        </div>
-        <h2 className="font-display text-2xl tracking-tight">Build workspace is recovering</h2>
-        <p className="mt-3 text-sm text-muted-foreground">
-          Build mode now has a crash-proof fallback, so the app won’t blank even if the dedicated build module fails to load during preview refreshes.
-        </p>
-        <div className="mt-6 flex items-center justify-center gap-3">
-          <Button variant="outline" onClick={() => window.location.reload()}>
-            Reload preview
-          </Button>
-          <Button onClick={onExitBuild}>Exit build</Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const buildWorkspaceModules = import.meta.glob("../components/build/BuildWorkspace.tsx", { eager: true }) as Record<
-  string,
-  { BuildWorkspace?: typeof BuildWorkspaceFallback }
->;
-
-const BuildWorkspaceResolved =
-  buildWorkspaceModules["../components/build/BuildWorkspace.tsx"]?.BuildWorkspace ?? BuildWorkspaceFallback;
+import { BuildWorkspaceSafe } from "@/components/build/BuildWorkspaceSafe";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Razen" }, { name: "description", content: "Your AI employee." }] }),
