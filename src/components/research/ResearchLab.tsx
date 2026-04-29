@@ -17,10 +17,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUp, BookOpen, Beaker, Brain, Check, ChevronDown, ChevronRight,
   Download, FileText, Globe, Layers, Loader2, Plus, RefreshCw, Search,
-  Sparkles, Trash2, Zap, AlertCircle, ListChecks, Quote,
+  Sparkles, Trash2, Zap, AlertCircle, ListChecks, Quote, MessageSquare, Crown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
