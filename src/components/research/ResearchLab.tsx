@@ -774,13 +774,37 @@ function SourcesTab({ sources, subs }: { sources: Source[]; subs: SubQuestion[] 
 }
 
 function ReportTab({ active, onExport }: { active: Investigation | null; onExport: () => void }) {
+  // Quick-answer view
+  if (active?.isQuick && (active.quickAnswer || !active.report)) {
+    if (!active.quickAnswer) {
+      return (
+        <div className="flex h-full items-center justify-center p-8 text-center">
+          <div className="max-w-md">
+            <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary/60" />
+            <h3 className="font-display text-lg">Answering…</h3>
+            <p className="mt-2 text-sm text-muted-foreground">Quick answer mode — no sub-questions, just a direct, useful response.</p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="mx-auto max-w-3xl p-6">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Quick answer</span>
+          <span className="text-xs text-muted-foreground">Need depth? Hit <strong>Full Lab</strong> below.</span>
+        </div>
+        <h2 className="font-display text-2xl tracking-tight">{active.query}</h2>
+        <article className="prose prose-sm dark:prose-invert mt-4 max-w-none whitespace-pre-wrap leading-relaxed">{active.quickAnswer}</article>
+      </div>
+    );
+  }
   if (!active?.report) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-center">
         <div className="max-w-md">
           <BookOpen className="mx-auto mb-4 h-10 w-10 text-primary/60" />
           <h3 className="font-display text-lg">No report yet</h3>
-          <p className="mt-2 text-sm text-muted-foreground">Run the investigation, then synthesis will produce a long-form analyst memo with inline citations.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Run an investigation. For quick advice or focused questions use <strong>Quick</strong> — for deep multi-source briefs use <strong>Full Lab</strong>.</p>
         </div>
       </div>
     );
