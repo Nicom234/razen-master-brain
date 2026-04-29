@@ -210,7 +210,7 @@ function fmtElapsed(ms: number): string {
   return `${m}m ${s}s`;
 }
 
-export function ResearchLab({ onCreditsChange, onExitResearch }: ResearchLabProps) {
+export function ResearchLab({ onCreditsChange, onExitResearch, tier = "free" }: ResearchLabProps) {
   const [store, setStore] = useState<Record<string, Investigation>>(() => loadStore());
   const [activeId, setActiveId] = useState<string | null>(() => {
     const s = loadStore();
@@ -219,7 +219,7 @@ export function ResearchLab({ onCreditsChange, onExitResearch }: ResearchLabProp
   });
   const [input, setInput] = useState("");
   const [depth, setDepth] = useState<Depth>(3);
-  const [phase, setPhase] = useState<"idle" | "planning" | "investigating" | "synthesizing">("idle");
+  const [phase, setPhase] = useState<"idle" | "triage" | "quick" | "planning" | "investigating" | "synthesizing">("idle");
   const [now, setNow] = useState(Date.now());
   const [tab, setTab] = useState<"plan" | "subs" | "sources" | "report" | "notes">("plan");
   const reportRef = useRef<HTMLDivElement>(null);
