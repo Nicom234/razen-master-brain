@@ -653,7 +653,7 @@ function modePrompts(mode: Mode): string[] {
     case "research": return ["Compare Cursor, Windsurf, and Zed for a TypeScript team.", "What are the latest funding rounds in AI agents this quarter?"];
     case "write": return ["Draft a cold email to enterprise heads of operations.", "Rewrite this paragraph in the voice of The Economist."];
     case "plan": return ["Plan a 30-day launch for a new SaaS pricing page.", "Break a website redesign into a 2-week sprint."];
-    case "build": return ["Write a TypeScript Zod schema for a Stripe webhook.", "Debug a flaky React useEffect race condition."];
+    case "build": return ["Build an Apple-clean SaaS landing page for a meeting AI called Quill — hero, pricing, signup modal, FAQ.", "Make a dark glassmorphic fintech dashboard with KPI cards, a chart, and a sortable transactions table."];
   }
 }
 
