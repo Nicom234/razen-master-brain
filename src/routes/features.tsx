@@ -82,8 +82,8 @@ const MODES = [
   {
     icon: Code2,
     title: "Build mode",
-    body: "Production code, not pseudo-snippets. Reviews architectures. Suggests tests. Returns artifacts you can ship today.",
-    sample: "Add Stripe webhook signature verification to my Next.js route.",
+    body: "A real product studio. Describe an app — Razen ships working HTML/CSS/JS with a live sandboxed preview, file tree, iteration, and ZIP export. Every button wired, every form validated, every link resolved.",
+    sample: "Build an Apple-clean SaaS landing page with hero, pricing, signup modal, and FAQ.",
   },
 ];
 
