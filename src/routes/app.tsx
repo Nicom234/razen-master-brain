@@ -326,8 +326,12 @@ function AppPage() {
     }
   };
 
-  if (loading || !user) {
+  if (loading) {
     return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Loading…</div>;
+  }
+
+  if (!user) {
+    return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Redirecting…</div>;
   }
 
   const ModeIcon = MODES.find((m) => m.id === mode)?.icon ?? Search;
