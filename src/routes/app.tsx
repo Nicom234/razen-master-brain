@@ -657,7 +657,10 @@ function modePrompts(mode: Mode): string[] {
     case "research": return ["Compare Cursor, Windsurf, and Zed for a TypeScript team.", "What are the latest funding rounds in AI agents this quarter?"];
     case "write": return ["Draft a cold email to enterprise heads of operations.", "Rewrite this paragraph in the voice of The Economist."];
     case "plan": return ["Plan a 30-day launch for a new SaaS pricing page.", "Break a website redesign into a 2-week sprint."];
-    case "build": return ["Build an Apple-clean SaaS landing page for a meeting AI called Quill — hero, pricing, signup modal, FAQ.", "Make a dark glassmorphic fintech dashboard with KPI cards, a chart, and a sortable transactions table."];
+    case "build": return [
+      "Build an Apple-clean SaaS landing page for a meeting AI called Quill — hero, animated 'how it works', three-tier pricing with a working monthly/annual toggle, signup modal, FAQ accordion, dark mode toggle.",
+      "Build a dark glassmorphic fintech dashboard for Lumen Capital — sidebar nav, Cmd+K command palette, KPI cards with sparklines, a revenue chart with 7d/30d/90d toggle, a sortable filterable transactions table, and a donut allocation chart. Realistic seed data.",
+    ];
   }
 }
 

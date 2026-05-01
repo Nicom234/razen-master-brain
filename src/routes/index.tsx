@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { ArrowRight, Search, PenTool, ListChecks, Code2, Quote, Check, Minus, Brain } from "lucide-react";
+import { ArrowRight, Search, PenTool, ListChecks, Code2, Quote, Check, Minus, Brain, Eye, FileCode, Hammer, Sparkles, Wand2, Download, Layers, Terminal, Loader2 } from "lucide-react";
 import { Nav } from "@/components/Nav";
 import { Button } from "@/components/ui/button";
 
@@ -24,6 +24,7 @@ function Landing() {
       <Hero />
       <Marquee />
       <Modes />
+      <BuildShowcase />
       <Demo />
       <Compare />
       <Proof />
@@ -142,7 +143,7 @@ function Modes() {
     { icon: Search, title: "Research", body: "Live web search with cited sources. Cross-references, fact-checks, writes a brief — not a hallucination.", badge: "Cited sources" },
     { icon: PenTool, title: "Write", body: "Drafts, edits, polishes. Matches your tone. Returns clean copy with a change-log of every cut.", badge: "Editorial-grade" },
     { icon: ListChecks, title: "Plan", body: "Turns a vague goal into a structured plan with owners, timelines, risks and a definition of done.", badge: "McKinsey-grade" },
-    { icon: Code2, title: "Build", body: "Writes runnable code. Reviews architectures. Debugs. Returns artifacts you can ship today.", badge: "Staff-engineer" },
+    { icon: Code2, title: "Build", body: "Describe an app — Razen ships it. A real product studio with a sandboxed live preview, file tree, iteration, and ZIP export.", badge: "Lovable-grade" },
   ];
   return (
     <section>
@@ -172,6 +173,155 @@ function Modes() {
                 {it.badge}
               </div>
             </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BuildShowcase() {
+  return (
+    <section className="relative overflow-hidden border-t border-border/60 bg-foreground text-background">
+      <div className="pointer-events-none absolute -left-32 top-0 h-[32rem] w-[32rem] rounded-full opacity-20 blur-3xl"
+           style={{ background: "radial-gradient(circle, oklch(0.7 0.18 45 / 0.9), transparent 70%)" }} />
+      <div className="pointer-events-none absolute right-[-10rem] bottom-[-10rem] h-[28rem] w-[28rem] rounded-full opacity-15 blur-3xl"
+           style={{ background: "radial-gradient(circle, oklch(0.85 0.22 80 / 0.6), transparent 70%)" }} />
+
+      <div className="relative mx-auto max-w-6xl px-5 py-24 md:py-32">
+        <div className="grid gap-12 md:grid-cols-2 md:items-center">
+          {/* Left: positioning */}
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-background/20 bg-background/5 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-background/70">
+              <Hammer className="h-3 w-3" /> Build Studio
+            </div>
+            <h2 className="mt-5 font-display text-5xl leading-[1.02] md:text-6xl">
+              Lovable, bolt.new, v0 — <span className="italic text-primary">in your chat.</span>
+            </h2>
+            <p className="mt-6 max-w-md text-lg leading-relaxed text-background/70">
+              A real product studio. Describe an app — Razen designs it, codes it, and runs it in a
+              sandboxed live preview. Iterate in plain English. Every button wired, every form validated.
+              Export the whole project as a ZIP. No build step. No lock-in.
+            </p>
+
+            <ul className="mt-8 grid gap-3">
+              {[
+                { i: Eye, t: "Live sandboxed preview", d: "See your app run as it streams in. Errors and console output stream back to you." },
+                { i: FileCode, t: "Multi-file projects", d: "HTML, CSS, JS — split into clean modules. View the file tree, edit any file inline." },
+                { i: Wand2, t: "Iterate in plain English", d: "“Add a dark mode toggle.” “Polish the typography.” Razen edits — and only re-emits what changed." },
+                { i: Download, t: "Yours forever", d: "Download as a ZIP. Pure HTML/CSS/JS. Drop it on Vercel, Netlify, or your own server." },
+              ].map((b) => (
+                <li key={b.t} className="flex items-start gap-3">
+                  <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md bg-background/10 text-background/80">
+                    <b.i className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">{b.t}</div>
+                    <p className="text-sm text-background/65">{b.d}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-10 flex flex-wrap items-center gap-3">
+              <Link to="/signup">
+                <Button size="lg" className="h-12 rounded-full bg-background px-7 text-base text-foreground hover:bg-background/90">
+                  Try Build free <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+              <Link to="/features">
+                <Button size="lg" variant="outline" className="h-12 rounded-full border-background/30 bg-transparent px-7 text-base text-background hover:bg-background/10 hover:text-background">
+                  See capabilities
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Right: window mockup of the studio */}
+          <motion.div
+            initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+            transition={{ duration: 0.7 }}
+            className="relative overflow-hidden rounded-2xl border border-background/15 bg-foreground/95 shadow-2xl"
+          >
+            {/* Window chrome */}
+            <div className="flex items-center gap-2 border-b border-background/10 bg-background/[0.04] px-4 py-2.5">
+              <div className="flex gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-background/15" />
+                <span className="h-2.5 w-2.5 rounded-full bg-background/15" />
+                <span className="h-2.5 w-2.5 rounded-full bg-background/15" />
+              </div>
+              <div className="ml-2 truncate font-mono text-[11px] text-background/60">razen / build · quill-landing</div>
+              <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-background/20 px-2 py-0.5 text-[10px] text-background/70">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live
+              </span>
+            </div>
+            {/* Tabs row */}
+            <div className="flex items-center gap-1 border-b border-background/10 bg-background/[0.02] px-3 py-1.5 text-[11px]">
+              <span className="rounded-full bg-background/10 px-2 py-0.5 text-background/90 inline-flex items-center gap-1"><Eye className="h-3 w-3" /> Preview</span>
+              <span className="px-2 py-0.5 text-background/50 inline-flex items-center gap-1"><Code2 className="h-3 w-3" /> Code</span>
+              <span className="px-2 py-0.5 text-background/50 inline-flex items-center gap-1"><Terminal className="h-3 w-3" /> Console</span>
+              <span className="ml-auto font-mono text-background/40">7 files · gemini 3 flash</span>
+            </div>
+            {/* Body: file tree + faux preview */}
+            <div className="grid grid-cols-[140px_1fr] divide-x divide-background/10">
+              <div className="space-y-1 bg-background/[0.02] p-2 text-[11px] font-mono text-background/70">
+                <div className="flex items-center gap-1.5"><FileCode className="h-3 w-3 text-primary" /> index.html</div>
+                <div className="flex items-center gap-1.5 opacity-70"><FileCode className="h-3 w-3" /> styles.css</div>
+                <div className="flex items-center gap-1.5 opacity-70"><FileCode className="h-3 w-3" /> main.js</div>
+                <div className="flex items-center gap-1.5 opacity-70"><FileCode className="h-3 w-3" /> store.js</div>
+                <div className="flex items-center gap-1.5 opacity-50 text-primary">
+                  <Loader2 className="h-3 w-3 animate-spin" /> ui.js
+                </div>
+              </div>
+              <div className="bg-white p-4 text-foreground">
+                {/* Faux landing page mock */}
+                <div className="rounded-md border border-foreground/10 bg-card/40 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="grid h-4 w-4 place-items-center rounded bg-foreground text-background font-display text-[10px]">Q</span>
+                      <span className="text-[10px] font-medium tracking-wide">QUILL</span>
+                    </div>
+                    <span className="rounded-full bg-foreground px-2 py-0.5 text-[8px] text-background">Try free</span>
+                  </div>
+                  <div className="mt-3 font-display text-sm leading-tight">Meeting intel,<br />without the noise.</div>
+                  <p className="mt-1.5 text-[9px] leading-snug text-muted-foreground">Records, summarises, and actions every meeting your team runs.</p>
+                  <div className="mt-2 flex gap-1">
+                    <span className="rounded-full bg-foreground px-2 py-0.5 text-[8px] text-background">Get started</span>
+                    <span className="rounded-full border border-foreground/20 px-2 py-0.5 text-[8px]">Watch demo</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-1.5">
+                    <div className="rounded-sm bg-muted/60 p-1.5 text-[7px] text-muted-foreground">⏺ Live transcripts</div>
+                    <div className="rounded-sm bg-muted/60 p-1.5 text-[7px] text-muted-foreground">⚑ Action items</div>
+                    <div className="rounded-sm bg-muted/60 p-1.5 text-[7px] text-muted-foreground">∞ Searchable</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom toolbar */}
+            <div className="flex items-center gap-2 border-t border-background/10 bg-background/[0.04] px-3 py-2">
+              <span className="font-mono text-[10px] text-background/50">~/quill-landing</span>
+              <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-background/5 px-2 py-1 text-[10px] text-background/70">
+                <Sparkles className="h-2.5 w-2.5 text-primary" /> Add a pricing FAQ section
+              </span>
+              <span className="rounded-full bg-primary px-2 py-1 text-[10px] font-medium text-primary-foreground">⏎</span>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Capability strip */}
+        <div className="mt-16 grid gap-3 border-t border-background/10 pt-12 sm:grid-cols-2 md:grid-cols-4">
+          {[
+            { i: Layers, t: "Real layouts", d: "Multi-section, responsive, designer-grade — never naked centred text." },
+            { i: Wand2, t: "Wired contracts", d: "Every CTA opens a working modal. Every link resolves. Forms validate." },
+            { i: Eye, t: "Sandboxed preview", d: "Runs in an isolated iframe. Console + errors stream back to you." },
+            { i: Download, t: "Yours forever", d: "Export the whole project. Pure HTML/CSS/JS. No lock-in." },
+          ].map((c) => (
+            <div key={c.t} className="rounded-xl border border-background/15 bg-background/[0.03] p-4">
+              <c.i className="h-4 w-4 text-primary" />
+              <div className="mt-3 text-sm font-semibold">{c.t}</div>
+              <p className="mt-1 text-xs leading-relaxed text-background/60">{c.d}</p>
+            </div>
           ))}
         </div>
       </div>

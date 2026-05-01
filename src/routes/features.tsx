@@ -82,8 +82,8 @@ const MODES = [
   {
     icon: Code2,
     title: "Build mode",
-    body: "A real product studio. Describe an app — Razen ships working HTML/CSS/JS with a live sandboxed preview, file tree, iteration, and ZIP export. Every button wired, every form validated, every link resolved.",
-    sample: "Build an Apple-clean SaaS landing page with hero, pricing, signup modal, and FAQ.",
+    body: "A real product studio. Describe an app — Razen designs, codes, and runs it in a sandboxed live preview. Multi-file projects with a file tree, plain-English iteration, error console, device sizing, and ZIP export. Every CTA opens a working modal, every form validates, every link resolves.",
+    sample: "Build a dark glassmorphic fintech dashboard with KPI cards, a sortable transactions table, and a working chart.",
   },
 ];
 
