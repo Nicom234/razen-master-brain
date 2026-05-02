@@ -39,6 +39,8 @@ interface Props {
   tier: Tier;
   onExitBuild: () => void;
   onCreditsChange?: (n: number) => void;
+  selectedId?: string | null;
+  onRefresh?: () => void;
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -219,7 +221,7 @@ const PRESET_GROUPS = Array.from(new Set(PRESETS.map((p) => p.group)));
 // ────────────────────────────────────────────────────────────────────────────────
 // Main component
 // ────────────────────────────────────────────────────────────────────────────────
-export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange }: Props) {
+export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange, selectedId, onRefresh }: Props) {
   const [projects, setProjects] = useState<Project[]>(() => loadProjects());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
@@ -271,6 +273,17 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange }: Props
 
   // Persist projects on change.
   useEffect(() => { saveProjects(projects); }, [projects]);
+
+  // Sync with parent-selected project (from app.tsx sidebar).
+  useEffect(() => {
+    if (selectedId === null) {
+      setActiveId(null); // "New build" → show landing
+    } else if (selectedId && selectedId !== activeId) {
+      setActiveId(selectedId);
+      setView("preview");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
   // Auto-scroll chat as it streams.
   useEffect(() => {
@@ -432,7 +445,8 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange }: Props
     setActiveId(id);
     setView("preview");
     void stream({ project: proj, userPrompt: text, iteration: false });
-  }, [streaming, stream]);
+    setTimeout(() => onRefresh?.(), 200);
+  }, [streaming, stream, onRefresh]);
 
   const iterate = useCallback((prompt: string) => {
     if (!active || streaming) return;
@@ -517,6 +531,7 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange }: Props
   const deleteProject = (id: string) => {
     setProjects((all) => all.filter((p) => p.id !== id));
     if (activeId === id) { setActiveId(null); setView("preview"); setSelectedFile(null); }
+    setTimeout(() => onRefresh?.(), 200);
   };
 
   const back = () => {

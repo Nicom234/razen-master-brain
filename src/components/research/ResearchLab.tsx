@@ -97,6 +97,8 @@ interface ResearchLabProps {
   onCreditsChange: (credits: number | null) => void;
   onExitResearch: () => void;
   tier?: "free" | "pro" | "elite";
+  selectedId?: string | null;
+  onRefresh?: () => void;
 }
 
 
@@ -216,7 +218,7 @@ function fmtElapsed(ms: number): string {
   return `${m}m ${s}s`;
 }
 
-export function ResearchLab({ onCreditsChange, onExitResearch, tier = "free" }: ResearchLabProps) {
+export function ResearchLab({ onCreditsChange, onExitResearch, tier = "free", selectedId, onRefresh }: ResearchLabProps) {
   const [store, setStore] = useState<Record<string, Investigation>>(() => loadStore());
   const [activeId, setActiveId] = useState<string | null>(() => {
     const s = loadStore();
@@ -248,6 +250,18 @@ export function ResearchLab({ onCreditsChange, onExitResearch, tier = "free" }: 
     }
   }, [store]);
 
+  // Sync with parent-selected session (from app.tsx sidebar).
+  useEffect(() => {
+    if (selectedId === null) {
+      // "New" clicked in parent sidebar → create fresh
+      createInvestigation();
+    } else if (selectedId && selectedId !== activeId && store[selectedId]) {
+      setActiveId(selectedId);
+      setTab("plan");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
   const updateActive = (mut: (i: Investigation) => Investigation) => {
     if (!activeId) return;
     setStore((s) => {
@@ -264,6 +278,7 @@ export function ResearchLab({ onCreditsChange, onExitResearch, tier = "free" }: 
     setStore((s) => ({ ...s, [inv.id]: inv }));
     setActiveId(inv.id);
     setInput(""); setTab("plan"); setPhase("idle");
+    setTimeout(() => onRefresh?.(), 100);
   };
 
   const deleteInvestigation = (id: string) => {
@@ -272,6 +287,7 @@ export function ResearchLab({ onCreditsChange, onExitResearch, tier = "free" }: 
       const remaining = Object.keys(store).filter((k) => k !== id);
       setActiveId(remaining[0] ?? null);
     }
+    setTimeout(() => onRefresh?.(), 100);
   };
 
   const allSources = useMemo<Source[]>(() => {
@@ -525,91 +541,80 @@ Rules:
     a.click(); URL.revokeObjectURL(url);
   };
 
-  const investigations = Object.values(store).sort((a, b) => b.updatedAt - a.updatedAt);
+  // Simplified tab set: 3 tabs instead of 6
+  const visibleTabs = (["research", "report", "sources"] as const);
+  const [simpleTab, setSimpleTab] = useState<"research" | "report" | "sources">("research");
+
+  // Auto-advance tab when report is ready.
+  useEffect(() => {
+    if (active?.report) setSimpleTab("report");
+    else if (active && !active.report && active.subs.length > 0) setSimpleTab("research");
+  }, [active?.id, !!active?.report]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-background">
-      {/* Left rail: investigations */}
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-border/60 bg-card/30 lg:flex">
-        <div className="flex items-center justify-between border-b border-border/60 px-3 py-3">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Beaker className="h-4 w-4 text-primary" /> Research Lab
+    <div className="flex h-full w-full flex-col overflow-hidden bg-background">
+      {/* Top bar — clean, no redundant sidebar controls */}
+      <div className="flex items-center justify-between border-b border-border/60 bg-card/20 px-4 py-2.5">
+        <div className="flex items-center gap-3 min-w-0">
+          <Brain className="h-4 w-4 text-primary shrink-0" />
+          <div className="min-w-0">
+            <div className="truncate text-sm font-medium">{active?.query || "New investigation"}</div>
+            {active && <div className="text-[11px] text-muted-foreground">{DEPTH_LABELS[active.depth].label} · {DEPTH_LABELS[active.depth].tokens}</div>}
           </div>
-          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={createInvestigation} title="New investigation">
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
         </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          {investigations.length === 0 ? (
-            <div className="px-3 py-6 text-center text-xs text-muted-foreground">No investigations yet</div>
-          ) : investigations.map((inv) => (
-            <button
-              key={inv.id}
-              onClick={() => { setActiveId(inv.id); setTab("plan"); }}
-              className={`group mb-1 flex w-full items-start gap-2 rounded-md px-2 py-2 text-left text-xs transition ${
-                activeId === inv.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-              }`}
+        <div className="flex items-center gap-1">
+          {/* 3 clean tabs */}
+          {visibleTabs.map((t) => (
+            <button key={t} onClick={() => setSimpleTab(t)}
+              className={`rounded-full px-3 py-1.5 text-xs transition capitalize ${simpleTab === t ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}
             >
-              <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{inv.query || "Untitled investigation"}</div>
-                <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
-                  <span>{DEPTH_LABELS[inv.depth].label}</span>
-                  {inv.subs.length > 0 && <span>· {inv.subs.filter((s) => s.status === "done").length}/{inv.subs.length}</span>}
-                </div>
-              </div>
-              <Trash2
-                className="mt-0.5 h-3 w-3 opacity-0 transition group-hover:opacity-100 hover:text-destructive"
-                onClick={(e) => { e.stopPropagation(); deleteInvestigation(inv.id); }}
-              />
+              {t === "research" && "Research"}
+              {t === "report" && `Report${active?.report ? "" : ""}`}
+              {t === "sources" && `Sources${allSources.length > 0 ? ` (${allSources.length})` : ""}`}
             </button>
           ))}
+          {active?.report && (
+            <Button variant="ghost" size="sm" className="h-8 px-2" onClick={exportReport} title="Export as Markdown">
+              <Download className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
-        <div className="border-t border-border/60 p-2">
-          <Button variant="ghost" size="sm" className="w-full justify-start text-xs" onClick={onExitResearch}>
-            ← Exit Research
-          </Button>
-        </div>
-      </aside>
+      </div>
 
-      {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top bar */}
-        <div className="flex items-center justify-between border-b border-border/60 bg-card/20 px-4 py-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <Brain className="h-5 w-5 text-primary shrink-0" />
-            <div className="min-w-0">
-              <div className="truncate text-sm font-semibold">{active?.query || "New investigation"}</div>
-              <div className="text-[11px] text-muted-foreground">{DEPTH_LABELS[depth].label} · {DEPTH_LABELS[depth].subs} · {DEPTH_LABELS[depth].tokens}</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 text-xs">
-            {(["plan", "subs", "sources", "activity", "report", "notes"] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`rounded-md px-2.5 py-1.5 transition ${tab === t ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
-              >
-                {t === "plan" && <span className="flex items-center gap-1.5"><ListChecks className="h-3 w-3" /> Plan</span>}
-                {t === "subs" && <span className="flex items-center gap-1.5"><Layers className="h-3 w-3" /> Sub-questions{active && active.subs.length > 0 ? ` (${active.subs.length})` : ""}</span>}
-                {t === "sources" && <span className="flex items-center gap-1.5"><Quote className="h-3 w-3" /> Sources{allSources.length > 0 ? ` (${allSources.length})` : ""}</span>}
-                {t === "activity" && <span className="flex items-center gap-1.5"><Activity className="h-3 w-3" /> Activity{active && active.activity?.length ? ` (${active.activity.length})` : ""}</span>}
-                {t === "report" && <span className="flex items-center gap-1.5"><BookOpen className="h-3 w-3" /> Report</span>}
-                {t === "notes" && <span className="flex items-center gap-1.5"><FileText className="h-3 w-3" /> Notes</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Body */}
-        <div ref={reportRef} className="flex-1 overflow-y-auto">
-          {tab === "plan" && <PlanTab active={active} phase={phase} now={now} />}
-          {tab === "subs" && <SubsTab active={active} now={now} />}
-          {tab === "sources" && <SourcesTab sources={allSources} subs={active?.subs ?? []} />}
-          {tab === "activity" && <ActivityTab events={active?.activity ?? []} phase={phase} />}
-          {tab === "report" && <ReportTab active={active} onExport={exportReport} onSuggestFollowUps={runFollowUps} onStartFollowUp={startFollowUp} />}
-          {tab === "notes" && <NotesTab active={active} onChange={(notes) => updateActive((i) => ({ ...i, notes }))} />}
-        </div>
+      {/* Body */}
+      <div ref={reportRef} className="flex-1 overflow-y-auto">
+        {simpleTab === "research" && (
+          <>
+            {(!active?.plan && !active?.quickAnswer) ? (
+              <PlanTab active={active} phase={phase} now={now} />
+            ) : active?.isQuick ? (
+              <QuickAnswerView active={active} />
+            ) : (
+              <div className="mx-auto max-w-3xl space-y-6 p-6">
+                {/* Activity feed — ambient, not dominant */}
+                {active && active.activity?.length > 0 && phase !== "idle" && (
+                  <ActivityFeed events={active.activity} phase={phase} />
+                )}
+                {/* Sub-question progress */}
+                {active && active.subs.length > 0 && <SubsTab active={active} now={now} />}
+                {/* Plan details (thesis etc) — shown inline */}
+                {active?.plan && (
+                  <div className="rounded-xl border border-border/60 bg-card/60 p-5 text-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Thesis</p>
+                    <p className="leading-relaxed text-foreground/90">{active.plan.thesis}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+        {simpleTab === "report" && (
+          <ReportTab active={active} onExport={exportReport} onSuggestFollowUps={runFollowUps} onStartFollowUp={startFollowUp} />
+        )}
+        {simpleTab === "sources" && (
+          <SourcesTab sources={allSources} subs={active?.subs ?? []} />
+        )}
+      </div>
 
         {/* Composer */}
         <div className="border-t border-border/60 bg-card/30 p-3">
@@ -668,6 +673,53 @@ Rules:
             </div>
           </div>
         </div>
+      </div>
+  );
+}
+
+// ---------- small helper views ----------
+function QuickAnswerView({ active }: { active: Investigation }) {
+  return (
+    <div className="mx-auto max-w-3xl p-6 space-y-5">
+      <div className="rounded-2xl border border-border/70 bg-card/60 p-6">
+        <div className="flex items-center gap-2 mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <Zap className="h-3 w-3 text-primary" /> Quick answer
+        </div>
+        <div className="prose prose-sm max-w-none text-foreground/90 leading-relaxed">
+          <pre className="whitespace-pre-wrap font-sans text-sm">{active.quickAnswer}</pre>
+        </div>
+      </div>
+      {active.quickSources && active.quickSources.length > 0 && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {active.quickSources.slice(0, 4).map((s, i) => (
+            <a key={i} href={s.url} target="_blank" rel="noreferrer"
+              className="flex items-center gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-xs transition hover:border-primary/40">
+              <img src={`https://www.google.com/s2/favicons?domain=${new URL(s.url).hostname}&sz=16`} alt="" className="h-3.5 w-3.5 rounded-sm shrink-0"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }} />
+              <span className="truncate text-muted-foreground">{s.title || new URL(s.url).hostname}</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActivityFeed({ events, phase }: { events: ActivityEvent[]; phase: string }) {
+  const recent = events.slice(-8);
+  return (
+    <div className="rounded-xl border border-border/60 bg-card/40 p-4">
+      <div className="flex items-center gap-2 mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <Activity className="h-3 w-3" /> Agent activity
+        {phase !== "idle" && <Loader2 className="h-3 w-3 animate-spin text-primary ml-auto" />}
+      </div>
+      <div className="space-y-2">
+        {recent.map((e, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs">
+            <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary/60 shrink-0 mt-1.5" />
+            <span className="text-muted-foreground leading-relaxed">{e.msg}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

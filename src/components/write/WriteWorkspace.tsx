@@ -132,6 +132,8 @@ function saveDocs(docs: Doc[]) {
 
 interface WriteWorkspaceProps {
   onCreditsChange: (n: number) => void;
+  selectedId?: string | null;
+  onRefresh?: () => void;
 }
 
 // Hook: drive ghost-text autocomplete. Watches editor for ~700ms idle moments
@@ -245,7 +247,7 @@ function useGhostText(editor: Editor | null, enabled: boolean, onCreditsChange: 
   }, [editor, enabled, onCreditsChange]);
 }
 
-export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
+export function WriteWorkspace({ onCreditsChange, selectedId, onRefresh }: WriteWorkspaceProps) {
   const [docs, setDocs] = useState<Doc[]>(() => loadDocs());
   const [activeId, setActiveId] = useState<string | null>(() => loadDocs()[0]?.id ?? null);
   const [busy, setBusy] = useState<WriteAction | null>(null);
@@ -293,6 +295,17 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
       setDocs([d]); setActiveId(d.id);
     } else if (!activeId) setActiveId(docs[0].id);
   }, []); // eslint-disable-line
+
+  // Sync with parent-selected doc (from app.tsx sidebar).
+  useEffect(() => {
+    if (selectedId === null) {
+      // "New document" clicked in parent sidebar
+      newDoc();
+    } else if (selectedId && selectedId !== activeId) {
+      setActiveId(selectedId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
   // autosave + version snapshots: every meaningful change captures a snapshot,
   // capped at 30 to keep storage sane. Old ones are evicted FIFO.
@@ -344,6 +357,7 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
     setDocs((ds) => { const n = [d, ...ds]; saveDocs(n); return n; });
     setActiveId(d.id);
     setTimeout(() => editor.commands.setContent(seed), 30);
+    setTimeout(() => onRefresh?.(), 150);
   };
 
   const deleteDoc = (id: string) => {
@@ -354,6 +368,7 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
       if (id === activeId) setActiveId(n[0]?.id ?? null);
       return n;
     });
+    setTimeout(() => onRefresh?.(), 150);
   };
 
   const renameDoc = (id: string, title: string) => {
