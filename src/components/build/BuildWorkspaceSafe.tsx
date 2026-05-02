@@ -5,7 +5,7 @@ import {
   Copy, ExternalLink, Square, Trash2, Loader2, Wand2, Layers,
   Layout, Gamepad2, BarChart3, Newspaper, ShoppingBag, BookOpen, Smartphone,
   Globe, Zap, Rocket, ChevronRight, Hammer, ArrowLeft,
-  Monitor, Tablet,
+  Monitor, Tablet, Maximize2, Minimize2, Brain, Workflow,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -158,46 +158,56 @@ function buildSrcDoc(files: FileMap): string {
 // ────────────────────────────────────────────────────────────────────────────────
 // Curated, world-class preset prompts (built to wow on first run)
 // ────────────────────────────────────────────────────────────────────────────────
-type Preset = { id: string; label: string; icon: typeof Layout; group: string; prompt: string };
+type Preset = { id: string; label: string; icon: typeof Layout; group: string; prompt: string; gradient: string };
 const PRESETS: Preset[] = [
   {
     id: "saas-landing", label: "SaaS landing — 'Quill'", group: "Landing pages", icon: Rocket,
+    gradient: "from-orange-200 via-amber-100 to-rose-100",
     prompt: "Design and build the marketing site for **Quill**, a meeting-intelligence AI for product teams. Apple-clean aesthetic — generous whitespace, restrained type (Inter + Space Grotesk), single warm accent. Sections: sticky nav with anchor links + working theme toggle, hero with eyebrow tag/headline/subhead/dual CTA + a stylised product mock to the right, logo strip (5 fake but plausible enterprise marks), three-up feature cards with icon + headline + 2-line body, an animated 'how it works' 4-step strip, a long-form testimonial carousel with avatar circles, three-tier pricing with a 'Most popular' middle plan and a working monthly/annual toggle that updates prices with Tailwind transition, FAQ accordion, big closing CTA, full footer with policies. Every link works (smooth-scroll OR opens a footer modal). Primary CTA opens a real signup modal that validates email + password and persists to localStorage. Theme toggle persists. Polished micro-interactions throughout."
   },
   {
     id: "fintech-dash", label: "Dark glass fintech dashboard", group: "Dashboards", icon: BarChart3,
+    gradient: "from-slate-900 via-indigo-900 to-purple-900",
     prompt: "Build a dark glassmorphic fintech dashboard for a fictional company called **Lumen Capital**. Sidebar nav (Overview, Transactions, Cards, Investments, Reports, Settings), top bar with searchable command palette (Cmd+K) + notifications dropdown + avatar menu. Dashboard: 4 KPI cards with sparkline trends (use chart.js), a large revenue chart with 7d/30d/90d/1y toggle that re-renders the chart, a sortable filterable transactions table (search by merchant, filter by category, click headers to sort, pagination), recent activity feed, an investment allocation donut chart, a 'spending by category' horizontal bar chart. Realistic seed: 60 transactions with merchant names like Stripe, Figma, AWS, Notion, Vercel, dates spread over 3 months, categories. All buttons + filters + sorts + pagination work. Dark mode by default with a subtle gradient mesh background."
   },
   {
     id: "kanban", label: "Kanban with drag & drop", group: "Productivity", icon: Layers,
+    gradient: "from-sky-100 via-cyan-100 to-emerald-100",
     prompt: "Build **Drift**, a beautiful Kanban board app. Three columns: Backlog, In Progress, Done. Each card has a title, description preview, due date, priority dot, assignee initials avatar, tag chips. Click a card to open a detail drawer (right-side sliding panel) with full edit form + checklist + comments. Add card button per column opens an inline composer. Native HTML5 drag-and-drop to reorder within and between columns, with subtle ghost preview. Filter bar: search, tag filter, assignee filter. Header has board name (editable inline), avatar stack, share button (copies a fake share URL with toast). 12 seeded cards across columns with realistic content (e.g. 'Wire up Stripe subscription webhook'). Persist to localStorage. Slick spring-feel transitions on drop. Soft, modern aesthetic — Linear-inspired."
   },
   {
     id: "portfolio", label: "Editorial portfolio", group: "Personal", icon: BookOpen,
+    gradient: "from-stone-200 via-rose-100 to-amber-100",
     prompt: "Design **Aria Lin's** photographer/designer portfolio. Editorial fashion-magazine aesthetic — Fraunces serif headlines, Inter body, oversized hero image collage with parallax on scroll. Sections: hero, about (long-form first-person paragraph + portrait), selected works grid (8 projects with hover reveal of title + year), case study detail modal (clicking a work opens full-screen with image carousel + brief + role + outcomes), press strip with 6 publication marks, contact form (validated, submits to localStorage with success state). Smooth scroll, image lazy-loading, refined cursor follower on desktop. Use real Unsplash hotlinks for photography. Every nav anchor works."
   },
   {
     id: "ecommerce", label: "Boutique e-commerce", group: "Commerce", icon: ShoppingBag,
+    gradient: "from-rose-100 via-orange-100 to-yellow-100",
     prompt: "Build **Hesperide**, a small-batch perfume e-commerce site. Warm cream + dusty rose palette, serif display, generous whitespace. Sections: hero with hero product image + brand line, shop grid (12 perfumes, each with name, notes, price, hover swap to alternate angle), filter sidebar (notes: floral/woody/citrus/oriental — multi-select), product detail modal (image gallery, description, notes, size selector, quantity, Add to bag), sliding cart drawer (with quantity + remove + subtotal + checkout button → opens shipping form modal that confirms 'Order placed — order #1042'), wishlist (heart icon toggles + counter in header), reviews section with star ratings, newsletter footer. Cart persists to localStorage. Realistic French-brand product names like 'Nuit de Bergamote', 'Vétiver d'Été'."
   },
   {
     id: "snake", label: "Neon arcade — Snake", group: "Games & toys", icon: Gamepad2,
+    gradient: "from-fuchsia-900 via-purple-900 to-emerald-900",
     prompt: "Build a polished neon arcade Snake game. Canvas-based, smooth 60fps, dark CRT-style background with chromatic aberration glow, neon green snake, magenta food pellet, particle burst on eat. Score, high-score (localStorage), pause (Space), arrow keys + WASD + on-screen swipe-pad for mobile, difficulty selector (Slow/Med/Fast/Insane), responsive board sizing. Game-over overlay with score, new-high flash, and Restart. Beautiful start screen with retro pixel-styled headline 'NEON SNAKE' and Play button."
   },
   {
     id: "writer", label: "Markdown writer w/ split preview", group: "Tools", icon: Newspaper,
+    gradient: "from-amber-50 via-stone-100 to-neutral-200",
     prompt: "Build a focused Markdown writing app called **Scriv**. Split view: editor on the left (textarea-styled, monospace, line numbers gutter, 60ch column), live preview on the right (rendered with marked.js + dompurify). Top bar: doc title (editable), word count, reading time, theme toggle (light/dark), export (.md + .html — both trigger downloads), import (file picker that fills editor). Sidebar: list of saved docs in localStorage, +New, rename inline, delete. Cmd+S saves & shows toast 'Saved'. Slash commands in editor: type '/h1' or '/quote' to insert markdown. Distraction-free toggle hides chrome. Calm sepia/cream theme by default."
   },
   {
     id: "pomodoro", label: "Mindful pomodoro timer", group: "Tools", icon: Zap,
+    gradient: "from-emerald-100 via-teal-100 to-sky-100",
     prompt: "Build **Bloom**, a beautiful mindful pomodoro timer. Big circular SVG progress ring at the centre with the current minutes:seconds inside, breathing-glow accent. Modes: Focus 25 / Short break 5 / Long break 15 — with tabs that animate. Start/Pause/Reset. Session counter (4 focus → long break). Task input above timer ('What are you working on?') is preserved across sessions. End-of-session chime (Web Audio API, soft bell). Settings drawer: customize durations + sound on/off + theme. Light + dark themes, persists. Optional ambient soundscape toggles (rain, forest, café — generated with simple oscillators or skip if too complex)."
   },
   {
     id: "weather", label: "Glassy weather app", group: "Apps", icon: Globe,
+    gradient: "from-blue-700 via-indigo-700 to-purple-800",
     prompt: "Build **Skyline**, a glassy weather app. Deep blue-to-purple gradient background that subtly animates, frosted glass cards. Search city (with autocomplete from a hardcoded list of 30 major cities — no API). Default city: Reykjavik. Show current temp huge, condition with custom SVG icon, feels-like, humidity, wind. Hourly strip (12 hours) with temp+icon. 7-day forecast list. Toggle °C/°F (persists). All forecast data is plausibly generated client-side from seeded data per city. Add-to-favorites (heart) shows quick-switch chips at top. Subtle particle weather effects (rain dots, snow, sun rays) layered behind based on current condition."
   },
   {
     id: "mobile-app", label: "Mobile-first habit tracker", group: "Apps", icon: Smartphone,
+    gradient: "from-violet-200 via-pink-200 to-rose-200",
     prompt: "Build **Streak**, a mobile-first habit tracker styled like a polished iOS app. Phone-frame container 390px wide centred on desktop, full screen on mobile. Bottom tab bar: Today, Habits, Stats, Profile. Today: list of today's habits with circular check buttons that fill on tap with spring animation, daily streak counter at top. Habits: list with reorder + add new (modal with emoji picker + colour + frequency days-of-week). Stats: 30-day heatmap calendar, current streaks, completion rate. Profile: name, settings. Localstorage persistence. Uses a soft pastel palette, SF-Pro-like font (Inter), rounded corners, subtle haptic-like animations on tap."
   },
 ];
@@ -217,9 +227,9 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange }: Props
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [consoleEntries, setConsoleEntries] = useState<{ kind: string; msg: string; ts: number }[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
   const [model, setModel] = useState<string | null>(null);
+  const [fullscreenPreview, setFullscreenPreview] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const initialPromptRef = useRef<HTMLTextAreaElement>(null);
   const iterRef = useRef<HTMLTextAreaElement>(null);
@@ -510,11 +520,20 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange }: Props
             <ViewTab icon={Terminal} label="Console" active={view === "console"} onClick={() => setView("console")} badge={errorCount || undefined} />
           </div>
           {view === "preview" && (
-            <div className="ml-1 hidden sm:flex items-center gap-0.5 rounded-full border border-border/70 bg-background p-0.5">
-              <DeviceBtn icon={Monitor} active={device === "desktop"} onClick={() => setDevice("desktop")} title="Desktop" />
-              <DeviceBtn icon={Tablet} active={device === "tablet"} onClick={() => setDevice("tablet")} title="Tablet" />
-              <DeviceBtn icon={Smartphone} active={device === "mobile"} onClick={() => setDevice("mobile")} title="Mobile" />
-            </div>
+            <>
+              <div className="ml-1 hidden sm:flex items-center gap-0.5 rounded-full border border-border/70 bg-background p-0.5">
+                <DeviceBtn icon={Monitor} active={device === "desktop"} onClick={() => setDevice("desktop")} title="Desktop" />
+                <DeviceBtn icon={Tablet} active={device === "tablet"} onClick={() => setDevice("tablet")} title="Tablet" />
+                <DeviceBtn icon={Smartphone} active={device === "mobile"} onClick={() => setDevice("mobile")} title="Mobile" />
+              </div>
+              <Button
+                variant="ghost" size="sm" className="h-8 px-2"
+                title={fullscreenPreview ? "Exit fullscreen" : "Fullscreen preview"}
+                onClick={() => setFullscreenPreview((v) => !v)}
+              >
+                {fullscreenPreview ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              </Button>
+            </>
           )}
           {streaming ? (
             <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={stopStream}>
@@ -537,8 +556,8 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange }: Props
       </div>
 
       <div className="flex flex-1 min-h-0">
-        {/* Chat / iteration sidebar */}
-        <aside className="hidden w-[340px] shrink-0 flex-col border-r border-border/60 bg-card/30 lg:flex">
+        {/* Chat / iteration sidebar — hidden in fullscreen preview */}
+        <aside className={`${fullscreenPreview && view === "preview" ? "hidden" : "hidden lg:flex"} w-[340px] shrink-0 flex-col border-r border-border/60 bg-card/30`}>
           <div ref={chatScrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
             {active.messages.length === 0 && !streaming && (
               <div className="rounded-xl border border-dashed border-border/70 bg-background/60 p-4 text-xs text-muted-foreground">
@@ -732,16 +751,22 @@ function BuildLanding({
               <button
                 key={p.id}
                 onClick={() => onStart(p.prompt)}
-                className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card/70 p-5 text-left shadow-soft transition hover:border-primary/40 hover:shadow-card"
+                className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card/70 text-left shadow-soft transition hover:border-primary/40 hover:shadow-card"
               >
-                <div className="flex items-start justify-between">
-                  <div className="grid h-9 w-9 place-items-center rounded-lg bg-foreground text-background">
-                    <p.icon className="h-4 w-4" />
+                <div className={`relative h-24 overflow-hidden bg-gradient-to-br ${p.gradient}`}>
+                  <div className="absolute inset-0 opacity-50 mix-blend-overlay" style={{ backgroundImage: "radial-gradient(circle at 30% 20%, rgba(255,255,255,0.6), transparent 60%), radial-gradient(circle at 80% 80%, rgba(0,0,0,0.15), transparent 50%)" }} />
+                  <div className="absolute inset-0 grid place-items-center">
+                    <div className="flex flex-col items-center gap-1 text-white/95 [text-shadow:0_1px_8px_rgba(0,0,0,0.25)]">
+                      <p.icon className="h-7 w-7 drop-shadow" />
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">{p.group}</span>
+                    </div>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                  <ChevronRight className="absolute right-3 top-3 h-4 w-4 text-white/80 transition-transform group-hover:translate-x-0.5" />
                 </div>
-                <div className="mt-4 font-display text-lg">{p.label}</div>
-                <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground">{p.prompt}</p>
+                <div className="p-4">
+                  <div className="font-display text-base leading-snug">{p.label}</div>
+                  <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{p.prompt}</p>
+                </div>
               </button>
             ))}
           </div>
@@ -831,29 +856,67 @@ function ChatBubble({ msg }: { msg: ChatMsg }) {
 }
 
 function StreamingBubble({ plan, files, active }: { plan?: string; files: string[]; active?: string | null }) {
+  // Surface a structured agent timeline so the user can see what's happening
+  // — design → wire → ship — instead of a single "loading" bubble.
+  const stage = !plan ? "design" : files.length === 0 && !active ? "design" : active ? "wire" : "polish";
+  const stages: { key: string; label: string; sub: string; icon: typeof Brain }[] = [
+    { key: "design", label: "Designing", sub: "Concept · aesthetic · structure", icon: Brain },
+    { key: "wire",   label: "Wiring",    sub: "Layout · components · interactions", icon: Workflow },
+    { key: "polish", label: "Polishing", sub: "States · responsiveness · finish", icon: Sparkles },
+  ];
+  const stageIdx = stages.findIndex((s) => s.key === stage);
   return (
-    <div className="rounded-2xl border border-primary/30 bg-primary/5 p-3 text-[13px]">
-      <div className="flex items-center gap-1.5 text-[11px] text-primary">
+    <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent shadow-soft">
+      <div className="flex items-center gap-1.5 border-b border-primary/15 bg-primary/5 px-3 py-1.5 text-[11px] font-medium text-primary">
         <Loader2 className="h-3 w-3 animate-spin" />
-        <span>Building…</span>
+        Razen agent · live
       </div>
-      {plan && <div className="mt-1.5 leading-relaxed text-foreground">{plan}</div>}
-      {(files.length > 0 || active) && (
-        <div className="mt-2 space-y-1">
-          {files.map((f) => (
-            <div key={f} className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground">
-              <Check className="h-3 w-3 text-primary" />
-              <span className="truncate">{f}</span>
-            </div>
-          ))}
-          {active && (
-            <div className="flex items-center gap-1.5 text-[11px] font-mono text-foreground">
-              <Loader2 className="h-3 w-3 animate-spin text-primary" />
-              <span className="truncate">{active}</span>
-            </div>
-          )}
+      <div className="px-3 py-3 text-[13px]">
+        {plan && <div className="leading-relaxed text-foreground">{plan}</div>}
+        {/* Stage rail */}
+        <div className="mt-3 flex items-stretch gap-1.5">
+          {stages.map((s, i) => {
+            const Active = s.icon;
+            const done = i < stageIdx;
+            const current = i === stageIdx;
+            return (
+              <div
+                key={s.key}
+                className={`flex-1 rounded-lg border px-2 py-1.5 transition ${
+                  current
+                    ? "border-primary/40 bg-primary/10 text-foreground"
+                    : done
+                    ? "border-primary/20 bg-background/60 text-foreground/80"
+                    : "border-border/50 bg-background/30 text-muted-foreground"
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  {done ? <Check className="h-3 w-3 text-primary" /> : current ? <Loader2 className="h-3 w-3 animate-spin text-primary" /> : <Active className="h-3 w-3" />}
+                  <span className="text-[11px] font-semibold">{s.label}</span>
+                </div>
+                <p className="mt-0.5 line-clamp-1 text-[10px] leading-tight opacity-80">{s.sub}</p>
+              </div>
+            );
+          })}
         </div>
-      )}
+        {/* File trail */}
+        {(files.length > 0 || active) && (
+          <div className="mt-3 space-y-1">
+            {files.map((f) => (
+              <div key={f} className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground">
+                <Check className="h-3 w-3 text-primary" />
+                <span className="truncate">{f}</span>
+              </div>
+            ))}
+            {active && (
+              <div className="flex items-center gap-1.5 text-[11px] font-mono text-foreground">
+                <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                <span className="truncate">writing {active}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -140,10 +140,10 @@ function Marquee() {
 
 function Modes() {
   const items = [
-    { icon: Search, title: "Research", body: "Live web search with cited sources. Cross-references, fact-checks, writes a brief — not a hallucination.", badge: "Cited sources" },
-    { icon: PenTool, title: "Write", body: "Drafts, edits, polishes. Matches your tone. Returns clean copy with a change-log of every cut.", badge: "Editorial-grade" },
-    { icon: ListChecks, title: "Plan", body: "Turns a vague goal into a structured plan with owners, timelines, risks and a definition of done.", badge: "McKinsey-grade" },
-    { icon: Code2, title: "Build", body: "Describe an app — Razen ships it. A real product studio with a sandboxed live preview, file tree, iteration, and ZIP export.", badge: "Lovable-grade" },
+    { icon: Search, title: "Research", body: "Decomposes a question into parallel sub-questions, searches the web, streams a live agent timeline, and synthesises a cited analyst memo. Then suggests where to dig next.", badge: "Perplexity-grade" },
+    { icon: PenTool, title: "Write", body: "Inline ghost-text autocomplete (Tab to accept). Focus mode dims everything but the current paragraph. Version history with one-click restore. Bubble-menu rewrites in any voice.", badge: "Notion-AI-grade" },
+    { icon: ListChecks, title: "Plan", body: "Outline · Kanban · Calendar views with owners, priorities, and due dates. Drag-and-drop, AI Monday standup memo, and a definition of done that actually means something.", badge: "Linear-grade" },
+    { icon: Code2, title: "Build", body: "A real product studio. Live sandboxed preview, multi-file projects, file tree, error console, plain-English iteration, fullscreen review, ZIP export.", badge: "Lovable-grade" },
   ];
   return (
     <section>

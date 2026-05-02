@@ -64,25 +64,25 @@ const MODES = [
   {
     icon: Search,
     title: "Research mode",
-    body: "Cross-references live web sources and writes a brief — with citations inline. No invented URLs. Flags uncertainty explicitly.",
-    sample: "Compare the funding history of the top 3 AI agent startups in 2025.",
+    body: "A research lab in a chat. Decomposes your question into parallel sub-questions, searches the web with citations, streams a live agent timeline of every step, and synthesises a long-form analyst memo. Suggests where to dig next.",
+    sample: "Compare the funding history of the top 3 AI agent startups in 2025 — who's defensible and why?",
   },
   {
     icon: PenTool,
     title: "Write mode",
-    body: "Editorial-grade drafting and revision. Matches your tone, returns a change-log of every cut. Pulitzer-trained voice.",
-    sample: "Tighten this fundraising email — make it sound less desperate.",
+    body: "Editorial-grade studio. Inline ghost-text autocomplete (Tab to accept). Focus mode dims everything but the current paragraph. Version history with one-click restore. Bubble-menu rewrites in any voice — NYT, Paul Graham, Stripe Press.",
+    sample: "Open with a sharp, specific observation about why most SaaS pricing pages feel apologetic.",
   },
   {
     icon: ListChecks,
     title: "Plan mode",
-    body: "Turns ambiguity into structure. Goal, assumptions, owners, timing, risks, definition of done. Pushes back when the goal is fuzzy.",
-    sample: "Plan a 6-week launch for a B2B SaaS in EU regulated markets.",
+    body: "Outline → Kanban → Calendar. Owners, priorities, due dates, drag-and-drop, AI-generated Monday standup memo, risks with severity, and a definition of done that actually means something. Pushes back when the goal is fuzzy.",
+    sample: "Plan a 6-week launch for a B2B SaaS in EU regulated markets, with a real GTM motion.",
   },
   {
     icon: Code2,
     title: "Build mode",
-    body: "A real product studio. Describe an app — Razen designs, codes, and runs it in a sandboxed live preview. Multi-file projects with a file tree, plain-English iteration, error console, device sizing, and ZIP export. Every CTA opens a working modal, every form validates, every link resolves.",
+    body: "A real product studio. Describe an app — Razen designs, codes, and runs it in a sandboxed live preview. Multi-file projects with a file tree, plain-English iteration, error console, device sizing, fullscreen preview, and ZIP export. Every CTA opens a working modal, every form validates, every link resolves.",
     sample: "Build a dark glassmorphic fintech dashboard with KPI cards, a sortable transactions table, and a working chart.",
   },
 ];

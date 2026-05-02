@@ -18,6 +18,7 @@ import {
   ArrowUp, BookOpen, Beaker, Brain, Check, ChevronDown, ChevronRight,
   Download, FileText, Globe, Layers, Loader2, Plus, RefreshCw, Search,
   Sparkles, Trash2, Zap, AlertCircle, ListChecks, Quote, MessageSquare, Crown,
+  Activity, Compass, ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,6 +48,9 @@ type Plan = {
   sections: string[];    // proposed report sections
   contrarian: string;    // what would change our mind
 };
+type ActivityKind = "info" | "plan" | "search" | "found" | "synthesize" | "quick" | "error";
+type ActivityEvent = { ts: number; kind: ActivityKind; msg: string; meta?: string };
+type FollowUp = { question: string; angle: string };
 type Investigation = {
   id: string;
   query: string;
@@ -60,6 +64,8 @@ type Investigation = {
   quickAnswer?: string;       // direct answer for non-research-grade questions
   quickSources?: Source[];    // sources for the quick answer
   isQuick?: boolean;          // marks this as a quick answer (not full lab)
+  activity: ActivityEvent[];  // chronological log of agent activity
+  followUps?: FollowUp[];     // AI-suggested next questions
 };
 
 const DEPTH_LABELS: Record<Depth, { label: string; subs: string; tokens: string; tone: string }> = {
@@ -109,7 +115,7 @@ function newInvestigation(query = ""): Investigation {
   return {
     id: crypto.randomUUID(),
     query, depth: 3, createdAt: Date.now(), updatedAt: Date.now(),
-    subs: [], notes: "",
+    subs: [], notes: "", activity: [],
   };
 }
 
@@ -221,7 +227,7 @@ export function ResearchLab({ onCreditsChange, onExitResearch, tier = "free" }: 
   const [depth, setDepth] = useState<Depth>(3);
   const [phase, setPhase] = useState<"idle" | "triage" | "quick" | "planning" | "investigating" | "synthesizing">("idle");
   const [now, setNow] = useState(Date.now());
-  const [tab, setTab] = useState<"plan" | "subs" | "sources" | "report" | "notes">("plan");
+  const [tab, setTab] = useState<"plan" | "subs" | "sources" | "report" | "activity" | "notes">("plan");
   const reportRef = useRef<HTMLDivElement>(null);
 
   const active = activeId ? store[activeId] : null;
@@ -248,6 +254,9 @@ export function ResearchLab({ onCreditsChange, onExitResearch, tier = "free" }: 
       const cur = s[activeId]; if (!cur) return s;
       return { ...s, [activeId]: { ...mut(cur), updatedAt: Date.now() } };
     });
+  };
+  const pushActivity = (kind: ActivityKind, msg: string, meta?: string) => {
+    updateActive((i) => ({ ...i, activity: [...(i.activity || []), { ts: Date.now(), kind, msg, meta }] }));
   };
 
   const createInvestigation = () => {
@@ -283,7 +292,8 @@ export function ResearchLab({ onCreditsChange, onExitResearch, tier = "free" }: 
     if (!active || !input.trim()) return;
     const query = input.trim();
     setPhase("planning"); setTab("plan");
-    updateActive((i) => ({ ...i, query, depth, plan: undefined, subs: [], report: undefined }));
+    updateActive((i) => ({ ...i, query, depth, plan: undefined, subs: [], report: undefined, activity: [], followUps: undefined }));
+    pushActivity("plan", `Drafting investigation plan at ${DEPTH_LABELS[depth].label} depth`, query);
 
     const target = DEPTH_TARGETS[depth];
     const sys = `You are Razen Research — Lab mode. The user posed a research question. You must produce a rigorous investigation plan.
@@ -313,11 +323,13 @@ Rules:
       );
       onCreditsChange(credits);
       const parsed = parsePlan(content, depth);
-      if (!parsed) { toast.error("Couldn't parse the plan — try rephrasing"); setPhase("idle"); return; }
+      if (!parsed) { pushActivity("error", "Couldn't parse plan — model returned malformed JSON"); toast.error("Couldn't parse the plan — try rephrasing"); setPhase("idle"); return; }
       updateActive((i) => ({ ...i, plan: parsed.plan, subs: parsed.subs }));
+      pushActivity("info", `Plan ready: ${parsed.subs.length} sub-questions, ${parsed.plan.hypotheses.length} hypotheses`, parsed.plan.thesis);
       setTab("plan");
       toast.success(`Plan ready — ${parsed.subs.length} sub-questions`);
     } catch (e) {
+      pushActivity("error", e instanceof Error ? e.message : "Planning failed");
       toast.error(e instanceof Error ? e.message : "Planning failed");
     } finally { setPhase("idle"); }
   };
@@ -330,6 +342,7 @@ Rules:
     updateActive((i) => ({ ...i, subs: i.subs.map((s) => ({ ...s, status: "pending", answer: undefined, sources: [], startedAt: undefined, finishedAt: undefined })) }));
 
     const subs = active.subs;
+    pushActivity("info", `Running ${subs.length} sub-questions in parallel`, `Concurrency 3, web search on`);
     const sys = `You are a research analyst. Answer the sub-question concisely (300-500 words) using web search. Inline-cite every factual claim with [Title](url) markdown links. End with a 1-line "Confidence: high/medium/low — because ...".`;
 
     // Run in parallel, but cap concurrency so we don't blow rate limits.
@@ -337,6 +350,7 @@ Rules:
     let cursor = 0;
     const runOne = async (sub: SubQuestion) => {
       updateActive((i) => ({ ...i, subs: i.subs.map((s) => s.id === sub.id ? { ...s, status: "running", startedAt: Date.now() } : s) }));
+      pushActivity("search", `Searching: ${sub.question}`, sub.angle);
       try {
         const { content, credits } = await callChat(
           [{ role: "system", content: sys }, { role: "user", content: `Question: ${sub.question}\n\nContext / why we care: ${sub.angle ?? "n/a"}\n\nQuery for the broader investigation: ${active.query}` }],
@@ -345,8 +359,10 @@ Rules:
         if (credits !== null) onCreditsChange(credits);
         const sources = extractSources(content, sub.id);
         updateActive((i) => ({ ...i, subs: i.subs.map((s) => s.id === sub.id ? { ...s, status: "done", answer: content, sources, finishedAt: Date.now() } : s) }));
+        pushActivity("found", `${sub.question.slice(0, 80)}${sub.question.length > 80 ? "…" : ""}`, `${sources.length} source${sources.length === 1 ? "" : "s"}`);
       } catch (e) {
         updateActive((i) => ({ ...i, subs: i.subs.map((s) => s.id === sub.id ? { ...s, status: "error", answer: e instanceof Error ? e.message : "Failed", finishedAt: Date.now() } : s) }));
+        pushActivity("error", `Failed: ${sub.question.slice(0, 60)}`, e instanceof Error ? e.message : undefined);
       }
     };
 
@@ -357,6 +373,7 @@ Rules:
       }
     });
     await Promise.all(workers);
+    pushActivity("info", "Investigation complete", `${subs.length} sub-questions resolved`);
     setPhase("idle");
     toast.success("Investigation complete — synthesize the report next");
   };
@@ -367,6 +384,7 @@ Rules:
       toast.error("Run the investigation first"); return;
     }
     setPhase("synthesizing"); setTab("report");
+    pushActivity("synthesize", "Synthesizing analyst memo", `${active.subs.length} sub-questions, depth ${DEPTH_LABELS[active.depth].label}`);
     const findings = active.subs.map((s, i) => `### Sub-question ${i + 1}: ${s.question}\n\n${s.answer ?? "(no answer)"}\n`).join("\n---\n");
     const depthInfo = DEPTH_LABELS[active.depth];
     const sys = `You are Razen Research — synthesizing a final analyst memo at ${depthInfo.label} depth (${depthInfo.tokens}, tone: ${depthInfo.tone}).
@@ -391,11 +409,50 @@ Rules:
       );
       if (credits !== null) onCreditsChange(credits);
       updateActive((i) => ({ ...i, report: content }));
+      pushActivity("info", "Report synthesized", `${content.length.toLocaleString()} chars`);
       toast.success("Report synthesized");
       setTimeout(() => reportRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 100);
     } catch (e) {
+      pushActivity("error", e instanceof Error ? e.message : "Synthesis failed");
       toast.error(e instanceof Error ? e.message : "Synthesis failed");
     } finally { setPhase("idle"); }
+  };
+
+  // Suggest follow-ups: a separate quick call from the live report+findings
+  // returning a JSON array of { question, angle } so we can render clickable
+  // chips that spawn a new investigation.
+  const runFollowUps = async () => {
+    if (!active?.report) return;
+    pushActivity("info", "Suggesting follow-ups");
+    const sys = `You are Razen Research. Read the analyst memo and propose 4 strong follow-up investigations the team should run next. Each should target a real gap, contradiction, or implication exposed by the memo.
+
+Return ONLY valid JSON (no fences, no prose):
+{ "followUps": [ { "question": "the next research question", "angle": "why this matters / what it would unlock" } ] }`;
+    try {
+      const { content, credits } = await callChat(
+        [{ role: "system", content: sys }, { role: "user", content: `Original question: ${active.query}\n\nMemo:\n\n${active.report}` }],
+        false,
+      );
+      if (credits !== null) onCreditsChange(credits);
+      const cleaned = content.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+      const start = cleaned.indexOf("{"); const end = cleaned.lastIndexOf("}");
+      if (start === -1 || end === -1) { toast.error("Couldn't parse follow-ups"); return; }
+      const obj = JSON.parse(cleaned.slice(start, end + 1)) as { followUps?: Array<{ question?: string; angle?: string }> };
+      const items = (obj.followUps ?? []).filter((f) => f.question).map((f) => ({ question: String(f.question), angle: String(f.angle ?? "") }));
+      updateActive((i) => ({ ...i, followUps: items }));
+      pushActivity("info", `${items.length} follow-ups suggested`);
+      toast.success("Follow-ups ready");
+    } catch (e) {
+      pushActivity("error", e instanceof Error ? e.message : "Follow-up generation failed");
+      toast.error("Follow-up generation failed");
+    }
+  };
+
+  const startFollowUp = (q: string) => {
+    const inv = newInvestigation(q);
+    setStore((s) => ({ ...s, [inv.id]: inv }));
+    setActiveId(inv.id);
+    setInput(q); setTab("plan"); setPhase("idle");
   };
 
   const runFullPipeline = async () => {
@@ -417,8 +474,9 @@ Rules:
     updateActive((i) => ({
       ...i, query, isQuick: true,
       plan: undefined, subs: [], report: undefined,
-      quickAnswer: "", quickSources: [],
+      quickAnswer: "", quickSources: [], activity: [], followUps: undefined,
     }));
+    pushActivity("quick", "Quick answer mode", query);
     const sys = `You are Razen Research — Quick Answer mode. The user asked a focused question that doesn't need a full multi-source investigation. Give a direct, opinionated, useful answer.
 
 Rules:
@@ -436,7 +494,9 @@ Rules:
       if (credits !== null) onCreditsChange(credits);
       const sources = extractSources(content, "quick");
       updateActive((i) => ({ ...i, quickAnswer: content, quickSources: sources }));
+      pushActivity("found", "Quick answer ready", `${sources.length} citation${sources.length === 1 ? "" : "s"}`);
     } catch (e) {
+      pushActivity("error", e instanceof Error ? e.message : "Quick answer failed");
       toast.error(e instanceof Error ? e.message : "Quick answer failed");
     } finally { setPhase("idle"); }
   };
@@ -524,7 +584,7 @@ Rules:
             </div>
           </div>
           <div className="flex items-center gap-1 text-xs">
-            {(["plan", "subs", "sources", "report", "notes"] as const).map((t) => (
+            {(["plan", "subs", "sources", "activity", "report", "notes"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -533,6 +593,7 @@ Rules:
                 {t === "plan" && <span className="flex items-center gap-1.5"><ListChecks className="h-3 w-3" /> Plan</span>}
                 {t === "subs" && <span className="flex items-center gap-1.5"><Layers className="h-3 w-3" /> Sub-questions{active && active.subs.length > 0 ? ` (${active.subs.length})` : ""}</span>}
                 {t === "sources" && <span className="flex items-center gap-1.5"><Quote className="h-3 w-3" /> Sources{allSources.length > 0 ? ` (${allSources.length})` : ""}</span>}
+                {t === "activity" && <span className="flex items-center gap-1.5"><Activity className="h-3 w-3" /> Activity{active && active.activity?.length ? ` (${active.activity.length})` : ""}</span>}
                 {t === "report" && <span className="flex items-center gap-1.5"><BookOpen className="h-3 w-3" /> Report</span>}
                 {t === "notes" && <span className="flex items-center gap-1.5"><FileText className="h-3 w-3" /> Notes</span>}
               </button>
@@ -545,7 +606,8 @@ Rules:
           {tab === "plan" && <PlanTab active={active} phase={phase} now={now} />}
           {tab === "subs" && <SubsTab active={active} now={now} />}
           {tab === "sources" && <SourcesTab sources={allSources} subs={active?.subs ?? []} />}
-          {tab === "report" && <ReportTab active={active} onExport={exportReport} />}
+          {tab === "activity" && <ActivityTab events={active?.activity ?? []} phase={phase} />}
+          {tab === "report" && <ReportTab active={active} onExport={exportReport} onSuggestFollowUps={runFollowUps} onStartFollowUp={startFollowUp} />}
           {tab === "notes" && <NotesTab active={active} onChange={(notes) => updateActive((i) => ({ ...i, notes }))} />}
         </div>
 
@@ -752,7 +814,13 @@ function SourcesTab({ sources, subs }: { sources: Source[]; subs: SubQuestion[] 
         {Array.from(byDomain.entries()).sort((a, b) => b[1].length - a[1].length).map(([domain, items]) => (
           <div key={domain} className="rounded-lg border border-border/60 bg-card/30 p-4">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-              <Globe className="h-3.5 w-3.5 text-muted-foreground" /> {domain}
+              <img
+                src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                alt=""
+                className="h-3.5 w-3.5 rounded-sm"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
+              />
+              {domain}
               <span className="text-xs font-normal text-muted-foreground">({items.length})</span>
             </div>
             <ul className="space-y-1.5 text-sm">
@@ -773,7 +841,68 @@ function SourcesTab({ sources, subs }: { sources: Source[]; subs: SubQuestion[] 
   );
 }
 
-function ReportTab({ active, onExport }: { active: Investigation | null; onExport: () => void }) {
+function ActivityTab({ events, phase }: { events: ActivityEvent[]; phase: string }) {
+  if (events.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center p-8 text-center">
+        <div className="max-w-md">
+          <Activity className="mx-auto mb-4 h-10 w-10 text-primary/60" />
+          <h3 className="font-display text-lg">No activity yet</h3>
+          <p className="mt-2 text-sm text-muted-foreground">As the agent plans, searches, and synthesizes, every step will stream into this timeline so you can see exactly how the answer was built.</p>
+        </div>
+      </div>
+    );
+  }
+  const ICON: Record<ActivityKind, typeof Activity> = {
+    info: Compass, plan: ListChecks, search: Search, found: Check, synthesize: BookOpen, quick: Zap, error: AlertCircle,
+  };
+  const TONE: Record<ActivityKind, string> = {
+    info: "bg-muted text-foreground/80",
+    plan: "bg-primary/10 text-primary",
+    search: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+    found: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    synthesize: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+    quick: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    error: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+  };
+  return (
+    <div className="mx-auto max-w-3xl p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="font-display text-lg">Agent activity</h3>
+        <span className="rounded-full border border-border/60 bg-card/80 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">{events.length} events</span>
+      </div>
+      <ol className="relative space-y-3 border-l-2 border-border/60 pl-5">
+        {events.map((e, i) => {
+          const Icon = ICON[e.kind];
+          const next = events[i + 1];
+          const dt = next ? next.ts - e.ts : 0;
+          return (
+            <li key={i} className="relative">
+              <span className={`absolute -left-[26px] grid h-5 w-5 place-items-center rounded-full ${TONE[e.kind]}`}>
+                <Icon className="h-3 w-3" />
+              </span>
+              <div className="rounded-lg border border-border/60 bg-card/50 px-3 py-2 text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="font-medium">{e.msg}</div>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">{new Date(e.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+                </div>
+                {e.meta && <div className="mt-0.5 text-xs text-muted-foreground">{e.meta}</div>}
+                {dt > 0 && <div className="mt-1 text-[10px] text-muted-foreground/70">+{dt < 1000 ? `${dt}ms` : `${(dt / 1000).toFixed(1)}s`} after</div>}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+      {phase !== "idle" && (
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-xs text-primary">
+          <Loader2 className="h-3 w-3 animate-spin" /> Agent active
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReportTab({ active, onExport, onSuggestFollowUps, onStartFollowUp }: { active: Investigation | null; onExport: () => void; onSuggestFollowUps: () => void; onStartFollowUp: (q: string) => void }) {
   // Quick-answer view
   if (active?.isQuick && (active.quickAnswer || !active.report)) {
     if (!active.quickAnswer) {
@@ -819,6 +948,42 @@ function ReportTab({ active, onExport }: { active: Investigation | null; onExpor
         <Button size="sm" variant="outline" onClick={onExport}><Download className="mr-1.5 h-3.5 w-3.5" /> Export .md</Button>
       </div>
       <article className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed">{active.report}</article>
+
+      {/* Follow-up investigations */}
+      <div className="mt-10 rounded-2xl border border-primary/25 bg-primary/5 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+              <Compass className="h-3 w-3" /> Where to dig next
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">Spawn a new Lab investigation from any of these — Razen carries forward the framing.</p>
+          </div>
+          {!active.followUps?.length && (
+            <Button size="sm" variant="outline" onClick={onSuggestFollowUps}>
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Suggest follow-ups
+            </Button>
+          )}
+        </div>
+        {active.followUps && active.followUps.length > 0 && (
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {active.followUps.map((f, i) => (
+              <button
+                key={i}
+                onClick={() => onStartFollowUp(f.question)}
+                className="group rounded-xl border border-border/70 bg-background p-4 text-left transition hover:border-primary/40 hover:bg-card"
+              >
+                <div className="flex items-start gap-2">
+                  <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-primary transition group-hover:translate-x-0.5" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium leading-snug">{f.question}</div>
+                    {f.angle && <div className="mt-1 text-xs leading-snug text-muted-foreground">{f.angle}</div>}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

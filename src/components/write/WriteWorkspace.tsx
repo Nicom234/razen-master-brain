@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEditor, EditorContent, Editor } from "@tiptap/react";
+import { Extension } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -7,7 +10,7 @@ import {
   Sparkles, Wand2, Minimize2, Maximize2, Languages, FileDown, Loader2, Check, X,
   Plus, FileText, Trash2, Target, ListTree, Quote, BookOpen, Mail, Megaphone,
   Newspaper, FileCode2, ChevronDown, History, Search, Bold, Italic, Heading1,
-  Heading2, List, ListOrdered,
+  Heading2, List, ListOrdered, Keyboard, Eye, EyeOff, RotateCcw, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,8 +45,72 @@ const STYLES = [
   { id: "casual-blog", label: "Casual blog", prompt: "a casual, friendly blog voice — first person, contractions, humour where natural" },
 ];
 
-type Doc = { id: string; title: string; html: string; updatedAt: number };
+type Snapshot = { ts: number; html: string };
+type Doc = { id: string; title: string; html: string; updatedAt: number; versions?: Snapshot[] };
 type WriteMode = "doc" | "essay" | "email" | "post" | "marketing" | "press";
+
+// ────────────────────────────────────────────────────────────────────────────
+// Ghost-text autocomplete — Cursor-style inline AI completion.
+// On idle, fetch a continuation. Render as a faded inline decoration at the
+// caret. Tab accepts. Escape dismisses. Any keypress also dismisses (we re-fire
+// on the next idle window).
+// ────────────────────────────────────────────────────────────────────────────
+type GhostState = { text: string; from: number } | null;
+const ghostKey = new PluginKey<GhostState>("razenGhostSuggestion");
+const SuggestionExtension = Extension.create({
+  name: "razenSuggestion",
+  addProseMirrorPlugins() {
+    return [
+      new Plugin<GhostState>({
+        key: ghostKey,
+        state: {
+          init(): GhostState { return null; },
+          apply(tr, value): GhostState {
+            const meta = tr.getMeta(ghostKey);
+            if (meta !== undefined) return meta as GhostState;
+            // Drop suggestion as soon as the doc changes (the user typed).
+            if (tr.docChanged) return null;
+            return value;
+          },
+        },
+        props: {
+          decorations(state) {
+            const v = ghostKey.getState(state);
+            if (!v) return DecorationSet.empty;
+            const span = document.createElement("span");
+            span.className = "razen-ghost-text";
+            span.style.opacity = "0.42";
+            span.style.pointerEvents = "none";
+            span.style.userSelect = "none";
+            span.style.fontStyle = "italic";
+            span.textContent = v.text;
+            return DecorationSet.create(state.doc, [Decoration.widget(v.from, span, { side: 1 })]);
+          },
+          handleKeyDown(view, event) {
+            const v = ghostKey.getState(view.state);
+            if (!v) return false;
+            if (event.key === "Tab" && !event.shiftKey) {
+              event.preventDefault();
+              view.dispatch(view.state.tr.insertText(v.text, v.from).setMeta(ghostKey, null));
+              return true;
+            }
+            if (event.key === "Escape") {
+              event.preventDefault();
+              view.dispatch(view.state.tr.setMeta(ghostKey, null));
+              return true;
+            }
+            return false;
+          },
+        },
+      }),
+    ];
+  },
+});
+function setGhost(editor: Editor, payload: { text: string; from: number } | null) {
+  editor.view.dispatch(editor.view.state.tr.setMeta(ghostKey, payload));
+}
+
+
 const TEMPLATES: { id: WriteMode; label: string; icon: typeof FileText; seed: string }[] = [
   { id: "doc", label: "Blank document", icon: FileText, seed: "" },
   { id: "essay", label: "Essay / article", icon: BookOpen, seed: "<h1>Working title</h1><p>Open with a sharp, specific observation.</p>" },
@@ -67,6 +134,117 @@ interface WriteWorkspaceProps {
   onCreditsChange: (n: number) => void;
 }
 
+// Hook: drive ghost-text autocomplete. Watches editor for ~700ms idle moments
+// after the user has typed a few characters, then fetches a short continuation
+// and renders it as an inline ghost decoration. Cancels in-flight requests on
+// new keystrokes. Disabled if `enabled` is false.
+function useGhostText(editor: Editor | null, enabled: boolean, onCreditsChange: (n: number) => void) {
+  const lastFiredFor = useRef<string>("");
+  const ctrlRef = useRef<AbortController | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!editor) return;
+    if (!enabled) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      ctrlRef.current?.abort();
+      setGhost(editor, null);
+      return;
+    }
+    const fire = async () => {
+      if (!editor) return;
+      const { from, to, empty } = editor.state.selection;
+      if (!empty) return;
+      // Don't autocomplete inside a heading at the very beginning.
+      const before = editor.state.doc.textBetween(Math.max(0, from - 600), from, "\n");
+      if (before.length < 12) return;
+      // Skip if line ends mid-word with a word char and no space (avoid mid-word inserts).
+      const last = before[before.length - 1];
+      if (last && /\w/.test(last)) {
+        // Allow if the user is at end-of-sentence; defer if mid-word.
+        // Insert a leading space when accepting if needed; the model will be told to start with a space.
+      }
+      const fingerprint = `${from}::${before.slice(-160)}`;
+      if (fingerprint === lastFiredFor.current) return;
+      lastFiredFor.current = fingerprint;
+
+      ctrlRef.current?.abort();
+      const ctrl = new AbortController(); ctrlRef.current = ctrl;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const sys = "You are a writer's autocomplete. The user is typing. Continue the passage in their voice for 6-20 words — natural, on-topic, finish the current thought or extend it. Return ONLY the continuation text. No quotes, no preamble, no explanation. If the previous character was a non-space word character, START with a single space. Do not start a new paragraph. Do not change tense or person. Stop at a natural pause.";
+        const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
+          method: "POST",
+          signal: ctrl.signal,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            mode: "write", useWebSearch: false,
+            messages: [
+              { role: "user", content: `${sys}\n\nPassage so far (the cursor is at the end):\n\n${before}` },
+            ],
+          }),
+        });
+        if (!resp.ok || !resp.body) return;
+        const remaining = resp.headers.get("X-Credits-Remaining");
+        if (remaining) onCreditsChange(Number(remaining));
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = ""; let acc = "";
+        while (true) {
+          const r = await reader.read();
+          if (r.done) break;
+          buf += decoder.decode(r.value, { stream: true });
+          let idx;
+          while ((idx = buf.indexOf("\n")) !== -1) {
+            let line = buf.slice(0, idx);
+            buf = buf.slice(idx + 1);
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (!line || line.startsWith(":") || !line.startsWith("data: ")) continue;
+            const json = line.slice(6).trim();
+            if (json === "[DONE]") break;
+            try {
+              const p = JSON.parse(json);
+              const c = p.choices?.[0]?.delta?.content;
+              if (c) acc += c;
+            } catch { /* ignore */ }
+          }
+        }
+        // Trim model artefacts and cap length to one or two sentences worth.
+        const cleaned = acc
+          .replace(/^"+|"+$/g, "")
+          .replace(/\n[\s\S]*$/, "")
+          .replace(/\s+$/g, "")
+          .slice(0, 200);
+        if (!cleaned) return;
+        // Bail if user has typed since we started.
+        if (editor.state.selection.from !== to || ctrl.signal.aborted) return;
+        setGhost(editor, { text: cleaned, from: editor.state.selection.from });
+      } catch { /* aborted or network — ignore */ }
+    };
+
+    const onUpdate = () => {
+      // Clear current ghost as user types and re-arm the idle timer.
+      setGhost(editor, null);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => { void fire(); }, 750);
+    };
+    const onSelection = () => {
+      // On bare selection moves, also clear (user moved the cursor).
+      setGhost(editor, null);
+    };
+    editor.on("update", onUpdate);
+    editor.on("selectionUpdate", onSelection);
+    return () => {
+      editor.off("update", onUpdate);
+      editor.off("selectionUpdate", onSelection);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      ctrlRef.current?.abort();
+    };
+  }, [editor, enabled, onCreditsChange]);
+}
+
 export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
   const [docs, setDocs] = useState<Doc[]>(() => loadDocs());
   const [activeId, setActiveId] = useState<string | null>(() => loadDocs()[0]?.id ?? null);
@@ -80,6 +258,9 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
   const [target, setTarget] = useState<number>(() => Number(localStorage.getItem("razen.write.target") || 0));
   const [wordCount, setWordCount] = useState(0);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [autocomplete, setAutocomplete] = useState<boolean>(() => localStorage.getItem("razen.write.autocomplete") !== "0");
+  const [focusMode, setFocusMode] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const lastSavedHtml = useRef<string>("");
 
   const active = useMemo(() => docs.find((d) => d.id === activeId) ?? null, [docs, activeId]);
@@ -87,6 +268,7 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
   const editor = useEditor({
     extensions: [
       StarterKit,
+      SuggestionExtension,
       Placeholder.configure({
         placeholder: ({ node }) =>
           node.type.name === "heading"
@@ -112,24 +294,47 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
     } else if (!activeId) setActiveId(docs[0].id);
   }, []); // eslint-disable-line
 
-  // autosave
+  // autosave + version snapshots: every meaningful change captures a snapshot,
+  // capped at 30 to keep storage sane. Old ones are evicted FIFO.
   useEffect(() => {
     if (!editor || !activeId) return;
     const id = setInterval(() => {
       const html = editor.getHTML();
       if (html !== lastSavedHtml.current) {
+        const lastHtml = lastSavedHtml.current;
         lastSavedHtml.current = html;
         setDocs((ds) => {
-          const next = ds.map((d) => d.id === activeId ? { ...d, html, updatedAt: Date.now() } : d);
+          const next = ds.map((d) => {
+            if (d.id !== activeId) return d;
+            const versions = (d.versions ?? []).slice();
+            // Only snapshot if there's a real change vs. the most recent snapshot.
+            if (lastHtml && (versions.length === 0 || versions[versions.length - 1].html !== lastHtml)) {
+              versions.push({ ts: Date.now(), html: lastHtml });
+              if (versions.length > 30) versions.splice(0, versions.length - 30);
+            }
+            return { ...d, html, updatedAt: Date.now(), versions };
+          });
           saveDocs(next); return next;
         });
         setSavedAt(new Date());
       }
-    }, 1500);
+    }, 2500);
     return () => clearInterval(id);
   }, [editor, activeId]);
 
   useEffect(() => { localStorage.setItem("razen.write.target", String(target)); }, [target]);
+  useEffect(() => { localStorage.setItem("razen.write.autocomplete", autocomplete ? "1" : "0"); }, [autocomplete]);
+
+  // Wire ghost-text autocomplete (after `editor` is created above).
+  useGhostText(editor, autocomplete && !busy, onCreditsChange);
+
+  // Restore a version into the editor.
+  const restoreVersion = useCallback((html: string) => {
+    if (!editor) return;
+    editor.commands.setContent(html, { emitUpdate: true });
+    toast.success("Version restored");
+    setHistoryOpen(false);
+  }, [editor]);
 
   if (!editor) return null;
 
@@ -315,9 +520,24 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
   const readingTime = Math.max(1, Math.round(wordCount / 220));
 
   return (
-    <div className="flex flex-1 min-h-0">
+    <div className={`flex flex-1 min-h-0 ${focusMode ? "razen-focus-mode" : ""}`}>
+      {focusMode && (
+        <style>{`
+          .razen-focus-mode .razen-write-sidebar,
+          .razen-focus-mode .razen-write-toolbar { display: none !important; }
+          .razen-focus-mode .razen-write-meta { opacity: 0.4; transition: opacity .3s; }
+          .razen-focus-mode .razen-write-meta:hover { opacity: 1; }
+          .razen-focus-mode .ProseMirror p:not(:has(:focus)),
+          .razen-focus-mode .ProseMirror h1:not(:has(:focus)),
+          .razen-focus-mode .ProseMirror h2:not(:has(:focus)),
+          .razen-focus-mode .ProseMirror h3:not(:has(:focus)),
+          .razen-focus-mode .ProseMirror li:not(:has(:focus)) {
+            opacity: 0.45; transition: opacity .3s;
+          }
+        `}</style>
+      )}
       {/* Doc sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-border/60 bg-card/30 lg:flex">
+      <aside className="razen-write-sidebar hidden w-60 shrink-0 flex-col border-r border-border/60 bg-card/30 lg:flex">
         <div className="p-3">
           <div className="relative mb-2">
             <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -371,7 +591,7 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
       {/* Editor column */}
       <div className="flex flex-1 min-w-0 flex-col">
         {/* Title + meta bar */}
-        <div className="border-b border-border/60 bg-card/20 px-4 py-2">
+        <div className="razen-write-meta border-b border-border/60 bg-card/20 px-4 py-2">
           <div className="flex items-center justify-between gap-3">
             <input
               value={active?.title ?? ""}
@@ -395,7 +615,7 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
         </div>
 
         {/* Action toolbar */}
-        <div className="flex flex-wrap items-center gap-1 border-b border-border/60 bg-card/10 px-3 py-1.5">
+        <div className="razen-write-toolbar flex flex-wrap items-center gap-1 border-b border-border/60 bg-card/10 px-3 py-1.5">
           <ToolbarBtn icon={<Bold className="h-3.5 w-3.5" />} label="Bold" onClick={() => editor.chain().focus().toggleBold().run()} />
           <ToolbarBtn icon={<Italic className="h-3.5 w-3.5" />} label="Italic" onClick={() => editor.chain().focus().toggleItalic().run()} />
           <ToolbarBtn icon={<Heading1 className="h-3.5 w-3.5" />} label="H1" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} />
@@ -454,6 +674,27 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
 
           <div className="ml-auto flex items-center gap-1">
             <button
+              onClick={() => setAutocomplete((v) => !v)}
+              title={autocomplete ? "Autocomplete on — Tab to accept, Esc to dismiss" : "Autocomplete off"}
+              className={`flex items-center gap-1 rounded px-2 py-1 text-[11px] transition ${autocomplete ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`}
+            >
+              <Zap className="h-3 w-3" />Auto
+            </button>
+            <button
+              onClick={() => setFocusMode((v) => !v)}
+              title={focusMode ? "Exit focus mode" : "Enter focus mode (Zen)"}
+              className={`flex items-center gap-1 rounded px-2 py-1 text-[11px] transition ${focusMode ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`}
+            >
+              {focusMode ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />} Focus
+            </button>
+            <button
+              onClick={() => setHistoryOpen((v) => !v)}
+              title="Version history"
+              className={`flex items-center gap-1 rounded px-2 py-1 text-[11px] transition ${historyOpen ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`}
+            >
+              <History className="h-3 w-3" />Versions {active?.versions?.length ? `(${active.versions.length})` : ""}
+            </button>
+            <button
               onClick={() => {
                 const v = prompt("Word count target:", String(target || 500));
                 if (v !== null) setTarget(Math.max(0, parseInt(v) || 0));
@@ -509,16 +750,76 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
         </BubbleMenu>
 
         {/* Editor surface */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-3xl px-6 md:px-10 py-12">
-            <EditorContent editor={editor} />
-            {busy && busy !== "continue" && (
-              <div className="fixed bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-popover px-4 py-2 text-sm shadow-2xl">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                Razen is writing…
-              </div>
-            )}
+        <div className="relative flex flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-3xl px-6 md:px-10 py-12">
+              <EditorContent editor={editor} />
+              {busy && busy !== "continue" && (
+                <div className="fixed bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-popover px-4 py-2 text-sm shadow-2xl">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  Razen is writing…
+                </div>
+              )}
+              {autocomplete && !focusMode && (
+                <div className="pointer-events-none fixed bottom-6 right-6 inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/80 px-2.5 py-1 text-[10px] text-muted-foreground backdrop-blur">
+                  <Keyboard className="h-3 w-3" />
+                  <span>Pause to draft · <kbd className="rounded border bg-background px-1 font-mono">Tab</kbd> accept · <kbd className="rounded border bg-background px-1 font-mono">Esc</kbd> dismiss</span>
+                </div>
+              )}
+              {focusMode && (
+                <button
+                  onClick={() => setFocusMode(false)}
+                  className="fixed bottom-6 right-6 inline-flex items-center gap-1.5 rounded-full border border-border bg-card/80 px-2.5 py-1 text-[11px] text-muted-foreground backdrop-blur hover:text-foreground"
+                  title="Exit focus mode"
+                >
+                  <EyeOff className="h-3 w-3" /> Exit focus
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Version history side panel */}
+          {historyOpen && active && (
+            <aside className="hidden w-72 shrink-0 flex-col border-l border-border/60 bg-card/40 lg:flex">
+              <div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <History className="h-3 w-3" /> Versions
+                </div>
+                <button onClick={() => setHistoryOpen(false)} className="rounded p-1 hover:bg-muted"><X className="h-3 w-3" /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">
+                {(active.versions ?? []).length === 0 ? (
+                  <p className="px-2 py-4 text-center text-xs text-muted-foreground">No snapshots yet — keep writing.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {(active.versions ?? []).slice().reverse().map((v) => {
+                      const text = v.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+                      const words = text.split(/\s+/).filter(Boolean).length;
+                      return (
+                        <button
+                          key={v.ts}
+                          onClick={() => restoreVersion(v.html)}
+                          className="group block w-full rounded-md border border-transparent bg-background/40 p-2 text-left text-xs transition hover:border-border hover:bg-card"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{new Date(v.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                            <span className="text-[10px] text-muted-foreground">{new Date(v.ts).toLocaleDateString([], { month: "short", day: "numeric" })}</span>
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">{text || "(empty)"}</p>
+                          <div className="mt-1.5 flex items-center justify-between">
+                            <span className="text-[10px] text-muted-foreground">{words} word{words === 1 ? "" : "s"}</span>
+                            <span className="hidden text-[10px] text-primary group-hover:inline">
+                              <RotateCcw className="inline h-3 w-3 mr-0.5" />Restore
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </aside>
+          )}
         </div>
       </div>
     </div>
