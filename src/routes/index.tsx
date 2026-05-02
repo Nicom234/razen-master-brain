@@ -26,11 +26,141 @@ function Landing() {
       <Modes />
       <BuildShowcase />
       <Demo />
+      <Tiers />
       <Compare />
       <Proof />
       <CTA />
       <Footer />
     </div>
+  );
+}
+
+function Tiers() {
+  const tiers = [
+    {
+      name: "Free",
+      price: "$0",
+      tagline: "Try every mode. No card.",
+      cta: { label: "Start free", to: "/signup" as const },
+      tone: "card",
+      features: [
+        "All four modes — Research, Write, Plan, Build",
+        "Generous monthly credits, refilled each period",
+        "Web research with citations, document uploads",
+        "Public share links · Markdown export",
+      ],
+    },
+    {
+      name: "Pro",
+      price: "$20",
+      cadence: "/mo",
+      tagline: "For operators who use Razen daily.",
+      cta: { label: "Upgrade to Pro", to: "/pricing" as const },
+      tone: "primary",
+      badge: "Most popular",
+      features: [
+        "10× the credits — power-user volume",
+        "Long-term memory across every chat",
+        "Build Studio: live preview, file tree, ZIP export",
+        "Version history with one-click restore",
+        "Priority routing — first-class queue",
+        "Up to 30MB documents, 50-page PDFs",
+      ],
+    },
+    {
+      name: "Elite",
+      price: "$60",
+      cadence: "/mo",
+      tagline: "Unlimited brain, agentic work.",
+      cta: { label: "Go Elite", to: "/pricing" as const },
+      tone: "dark",
+      features: [
+        "Everything in Pro, with the highest credit ceiling",
+        "Frontier reasoning models routed automatically",
+        "Build: forks, snapshots, auto-fix-errors, Cmd-K palette",
+        "Research: deeper agent depth, more parallel sub-questions",
+        "Plan: AI standup memo, calendar+kanban+outline views",
+        "Early access to new modes, agents and integrations",
+      ],
+    },
+  ];
+  return (
+    <section className="border-t border-border/60">
+      <div className="mx-auto max-w-6xl px-5 py-24 md:py-32">
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="text-sm font-medium text-primary">Pro &amp; Elite</p>
+          <h2 className="mt-3 font-display text-4xl md:text-5xl">Unlock the full team.</h2>
+          <p className="mt-5 text-lg text-muted-foreground">
+            Free covers the day-to-day. Pro and Elite add depth, memory, and the
+            studio-grade tools that turn Razen into an actual hire.
+          </p>
+        </div>
+
+        <div className="mt-14 grid gap-5 md:grid-cols-3">
+          {tiers.map((t, i) => {
+            const isPrimary = t.tone === "primary";
+            const isDark = t.tone === "dark";
+            return (
+              <motion.div
+                key={t.name}
+                initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+                transition={{ duration: 0.45, delay: i * 0.07 }}
+                className={`relative flex flex-col rounded-2xl border p-7 shadow-soft ${
+                  isPrimary
+                    ? "border-primary/50 bg-card shadow-card ring-1 ring-primary/30"
+                    : isDark
+                    ? "border-foreground/15 bg-foreground text-background"
+                    : "border-border/70 bg-card/70"
+                }`}
+              >
+                {t.badge && (
+                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground">
+                    {t.badge}
+                  </span>
+                )}
+                <div className={`text-xs font-semibold uppercase tracking-[0.2em] ${isDark ? "text-background/60" : "text-muted-foreground"}`}>
+                  {t.name}
+                </div>
+                <div className="mt-4 flex items-baseline gap-1">
+                  <span className="font-display text-5xl">{t.price}</span>
+                  {t.cadence && <span className={`text-sm ${isDark ? "text-background/60" : "text-muted-foreground"}`}>{t.cadence}</span>}
+                </div>
+                <p className={`mt-2 text-sm ${isDark ? "text-background/70" : "text-muted-foreground"}`}>{t.tagline}</p>
+
+                <ul className="mt-6 space-y-2.5 text-sm">
+                  {t.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2.5">
+                      <Check className={`mt-0.5 h-4 w-4 shrink-0 ${isDark ? "text-primary" : isPrimary ? "text-primary" : "text-foreground/70"}`} />
+                      <span className={isDark ? "text-background/85" : "text-foreground/85"}>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-8 pt-4">
+                  <Link to={t.cta.to} className="block">
+                    <Button
+                      className={`h-11 w-full rounded-full text-sm font-medium ${
+                        isDark
+                          ? "bg-background text-foreground hover:bg-background/90"
+                          : isPrimary
+                          ? ""
+                          : "bg-foreground text-background hover:bg-foreground/90"
+                      }`}
+                    >
+                      {t.cta.label} <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        <p className="mt-8 text-center text-xs text-muted-foreground">
+          Cancel any time. Annual billing saves ~20%. Team plans available — <Link to="/pricing" className="underline hover:text-foreground">see pricing</Link>.
+        </p>
+      </div>
+    </section>
   );
 }
 

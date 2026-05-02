@@ -6,6 +6,7 @@ import {
   Layout, Gamepad2, BarChart3, Newspaper, ShoppingBag, BookOpen, Smartphone,
   Globe, Zap, Rocket, ChevronRight, Hammer, ArrowLeft,
   Monitor, Tablet, Maximize2, Minimize2, Brain, Workflow,
+  History, GitFork, Wrench, RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,7 @@ const STORAGE_KEY = "razen.build.projects.v2";
 type Tier = "free" | "pro" | "elite";
 type FileMap = Record<string, string>;
 type ChatMsg = { role: "user" | "assistant"; content: string; plan?: string; files?: string[]; ts: number };
+type Snapshot = { ts: number; label: string; files: FileMap };
 type Project = {
   id: string;
   title: string;
@@ -30,6 +32,7 @@ type Project = {
   messages: ChatMsg[];
   updatedAt: number;
   createdAt: number;
+  snapshots?: Snapshot[];
 };
 
 interface Props {
@@ -230,6 +233,7 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange }: Props
   const [iframeKey, setIframeKey] = useState(0);
   const [model, setModel] = useState<string | null>(null);
   const [fullscreenPreview, setFullscreenPreview] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const initialPromptRef = useRef<HTMLTextAreaElement>(null);
   const iterRef = useRef<HTMLTextAreaElement>(null);
@@ -364,9 +368,16 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange }: Props
       setProjects((all) => all.map((p) => {
         if (p.id !== project.id) return p;
         const mergedFiles: FileMap = iteration ? { ...p.files, ...finalParsed.files } : { ...finalParsed.files };
+        // Capture a snapshot of the prior state so the user can restore.
+        const priorSnap: Snapshot | null =
+          iteration && Object.keys(p.files).length > 0
+            ? { ts: Date.now(), label: shortLabel(userPrompt), files: { ...p.files } }
+            : null;
+        const snaps = priorSnap ? [priorSnap, ...(p.snapshots ?? [])].slice(0, 20) : (p.snapshots ?? []);
         const updated: Project = {
           ...p,
           files: mergedFiles,
+          snapshots: snaps,
           updatedAt: Date.now(),
           messages: [
             ...p.messages,
@@ -459,6 +470,50 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange }: Props
 
   const stopStream = () => abortRef.current?.abort();
 
+  const forkProject = useCallback(() => {
+    if (!active) return;
+    const id = uid();
+    const fork: Project = {
+      ...active,
+      id,
+      title: `${active.title} (fork)`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      messages: [...active.messages],
+      files: { ...active.files },
+      snapshots: [],
+    };
+    setProjects((p) => [fork, ...p]);
+    setActiveId(id);
+    toast.success("Forked");
+  }, [active]);
+
+  const restoreSnapshot = useCallback((snap: Snapshot) => {
+    if (!active) return;
+    setProjects((all) => all.map((p) => {
+      if (p.id !== active.id) return p;
+      const priorSnap: Snapshot = { ts: Date.now(), label: "before restore", files: { ...p.files } };
+      return {
+        ...p,
+        files: { ...snap.files },
+        snapshots: [priorSnap, ...(p.snapshots ?? [])].slice(0, 20),
+        updatedAt: Date.now(),
+      };
+    }));
+    setIframeKey((k) => k + 1);
+    setHistoryOpen(false);
+    toast.success("Restored");
+  }, [active]);
+
+  const fixErrors = useCallback(() => {
+    if (!active || streaming) return;
+    const errs = consoleEntries.filter((e) => e.kind === "error").slice(-6);
+    if (errs.length === 0) return;
+    const detail = errs.map((e, i) => `${i + 1}. ${e.msg}`).join("\n");
+    const prompt = `The preview is throwing these errors. Diagnose and fix them — do not regress unrelated behavior:\n\n${detail}`;
+    void stream({ project: active, userPrompt: prompt, iteration: true });
+  }, [active, streaming, consoleEntries, stream]);
+
   const deleteProject = (id: string) => {
     setProjects((all) => all.filter((p) => p.id !== id));
     if (activeId === id) { setActiveId(null); setView("preview"); setSelectedFile(null); }
@@ -546,6 +601,20 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange }: Props
               </Button>
               <Button variant="ghost" size="sm" className="h-8 px-2" title="Open preview in new tab" onClick={openInNewTab} disabled={!srcDoc}>
                 <ExternalLink className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost" size="sm"
+                className={`h-8 px-2 ${(active.snapshots?.length ?? 0) > 0 ? "text-foreground" : "text-muted-foreground"}`}
+                title="Version history"
+                onClick={() => setHistoryOpen((v) => !v)}
+              >
+                <History className="h-3.5 w-3.5" />
+                {(active.snapshots?.length ?? 0) > 0 && (
+                  <span className="ml-1 hidden sm:inline text-[10px]">{active.snapshots?.length}</span>
+                )}
+              </Button>
+              <Button variant="ghost" size="sm" className="h-8 px-2" title="Fork project" onClick={forkProject}>
+                <GitFork className="h-3.5 w-3.5" />
               </Button>
               <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2" onClick={exportZip} disabled={fileList.length === 0}>
                 <Download className="h-3.5 w-3.5" /><span className="hidden sm:inline text-xs">Download</span>
@@ -648,11 +717,80 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange }: Props
               readOnly={streaming}
             />
           ) : (
-            <ConsolePane entries={consoleEntries} onClear={() => setConsoleEntries([])} />
+            <ConsolePane
+              entries={consoleEntries}
+              onClear={() => setConsoleEntries([])}
+              onFix={fixErrors}
+              canFix={!streaming && errorCount > 0}
+            />
+          )}
+
+          {/* Inline auto-fix banner — surface across any tab while errors exist */}
+          {view !== "console" && errorCount > 0 && !streaming && (
+            <button
+              onClick={fixErrors}
+              className="absolute bottom-4 right-4 z-20 inline-flex items-center gap-2 rounded-full border border-destructive/40 bg-background px-3.5 py-2 text-xs shadow-card transition hover:border-destructive hover:bg-destructive/5"
+              title="Send the latest sandbox errors to Razen and patch them"
+            >
+              <Wrench className="h-3.5 w-3.5 text-destructive" />
+              <span className="font-medium">Fix {errorCount} error{errorCount > 1 ? "s" : ""}</span>
+              <span className="text-muted-foreground">· auto-iterate</span>
+            </button>
           )}
         </main>
+
+        {/* Version history side panel */}
+        {historyOpen && (
+          <HistoryPanel
+            snapshots={active.snapshots ?? []}
+            onClose={() => setHistoryOpen(false)}
+            onRestore={restoreSnapshot}
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+function HistoryPanel({
+  snapshots, onClose, onRestore,
+}: {
+  snapshots: Snapshot[];
+  onClose: () => void;
+  onRestore: (s: Snapshot) => void;
+}) {
+  return (
+    <aside className="w-72 shrink-0 border-l border-border/60 bg-card/40">
+      <div className="flex h-9 items-center justify-between border-b border-border/60 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5"><History className="h-3 w-3" />History</span>
+        <button onClick={onClose} className="rounded p-1 hover:bg-muted"><X className="h-3 w-3" /></button>
+      </div>
+      <div className="overflow-y-auto p-2">
+        {snapshots.length === 0 ? (
+          <p className="px-2 py-3 text-xs text-muted-foreground">
+            No snapshots yet. Razen captures one before each iteration so you can restore an earlier state with one click.
+          </p>
+        ) : (
+          <div className="space-y-1">
+            {snapshots.map((s) => (
+              <button
+                key={s.ts}
+                onClick={() => onRestore(s)}
+                className="group block w-full rounded-lg border border-border/60 bg-background/60 p-3 text-left transition hover:border-primary/40 hover:bg-card"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-xs font-medium">{s.label}</span>
+                  <RotateCcw className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
+                </div>
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  {Object.keys(s.files).length} files · {relTime(s.ts)}
+                </p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </aside>
   );
 }
 
@@ -1049,14 +1187,26 @@ function CodePane({
   );
 }
 
-function ConsolePane({ entries, onClear }: { entries: { kind: string; msg: string; ts: number }[]; onClear: () => void }) {
+function ConsolePane({ entries, onClear, onFix, canFix }: {
+  entries: { kind: string; msg: string; ts: number }[];
+  onClear: () => void;
+  onFix: () => void;
+  canFix: boolean;
+}) {
   return (
     <div className="flex flex-1 min-h-0 flex-col">
       <div className="flex h-9 items-center justify-between border-b border-border/60 bg-card/40 px-3 text-xs">
         <div className="flex items-center gap-1.5 text-muted-foreground">
           <Terminal className="h-3 w-3" /> Sandbox console · {entries.length} {entries.length === 1 ? "entry" : "entries"}
         </div>
-        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={onClear}><X className="h-3 w-3 mr-1" />Clear</Button>
+        <div className="flex items-center gap-1">
+          {canFix && (
+            <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs" onClick={onFix}>
+              <Wrench className="h-3 w-3" /> Fix errors
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={onClear}><X className="h-3 w-3 mr-1" />Clear</Button>
+        </div>
       </div>
       <div className="flex-1 overflow-auto bg-[#0a0a0a] p-3 font-mono text-[12px] leading-relaxed">
         {entries.length === 0 ? (
@@ -1174,6 +1324,11 @@ const QUICK_ACTIONS = [
   "Add a section explaining pricing",
   "Add a subtle animation on scroll",
 ];
+
+function shortLabel(prompt: string): string {
+  const t = prompt.trim().split(/\n/)[0];
+  return t.length > 40 ? t.slice(0, 40) + "…" : t || "iteration";
+}
 
 function smartTitle(prompt: string): string {
   const m = prompt.match(/(?:build|design|make|create|ship)\s+([a-z0-9 ,'-]{3,40})/i);
