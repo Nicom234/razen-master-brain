@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { LockedFeature } from "@/components/UpgradeBanner";
 
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const STORE_KEY = "razen.research.lab.v1";
@@ -586,7 +587,7 @@ Rules:
         {simpleTab === "research" && (
           <>
             {(!active?.plan && !active?.quickAnswer) ? (
-              <PlanTab active={active} phase={phase} now={now} />
+              <PlanTab active={active} phase={phase} now={now} tier={tier} />
             ) : active?.isQuick ? (
               <QuickAnswerView active={active} />
             ) : (
@@ -623,7 +624,17 @@ Rules:
               <span className="font-semibold uppercase tracking-wider text-muted-foreground">Depth</span>
               <input
                 type="range" min={1} max={5} value={depth}
-                onChange={(e) => setDepth(Number(e.target.value) as Depth)}
+                onChange={(e) => {
+                  const v = Number(e.target.value) as Depth;
+                  // Hard tier locks: free caps at 2, pro caps at 3, elite full range
+                  const max = tier === "elite" ? 5 : tier === "pro" ? 3 : 2;
+                  if (v > max) {
+                    toast.message(`Depth ${v} requires ${v >= 4 ? "Elite" : "Pro"} — clamping to your tier max.`);
+                    setDepth(max as Depth);
+                  } else {
+                    setDepth(v);
+                  }
+                }}
                 className="h-1 w-32 cursor-pointer accent-primary"
                 disabled={phase !== "idle"}
               />
@@ -634,9 +645,14 @@ Rules:
                   Auto-route: <span className="font-semibold text-foreground">{classifyQuery(input) === "quick" ? "Quick answer" : "Full Lab"}</span>
                 </span>
               )}
-              {tier !== "elite" && depth >= 4 && (
+              {tier === "free" && (
                 <Link to="/pricing" className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
-                  <Crown className="h-2.5 w-2.5" /> Elite gives this depth real teeth
+                  <Crown className="h-2.5 w-2.5" /> Pro & Elite unlock deeper depth
+                </Link>
+              )}
+              {tier === "pro" && depth >= 3 && (
+                <Link to="/pricing" className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                  <Crown className="h-2.5 w-2.5" /> Elite goes deeper — 8 sub-questions, ~7k word memos
                 </Link>
               )}
               <span className="ml-auto text-muted-foreground">
@@ -726,20 +742,31 @@ function ActivityFeed({ events, phase }: { events: ActivityEvent[]; phase: strin
 }
 
 // ---------- panels ----------
-function PlanTab({ active, phase, now }: { active: Investigation | null; phase: string; now: number }) {
+function PlanTab({ active, phase, now, tier }: { active: Investigation | null; phase: string; now: number; tier?: "free" | "pro" | "elite" }) {
   if (!active) return null;
   if (!active.plan) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-center">
-        <div className="max-w-md">
+        <div className="max-w-xl">
           <Sparkles className="mx-auto mb-4 h-10 w-10 text-primary/60" />
-          <h3 className="font-display text-lg">Start an investigation</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Type your question below, pick a depth, and hit <strong>Run Lab</strong>. The Lab will draft a thesis, decompose your question into parallel sub-questions, search the web, and synthesize a long-form analyst memo with citations.
+          <h3 className="font-display text-2xl">Start an investigation</h3>
+          <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+            Type your question below, pick a depth, and hit <strong>Run Lab</strong>. Razen will draft a thesis, decompose your question into parallel sub-questions, search the web, and synthesize a long-form analyst memo with citations.
           </p>
           {phase === "planning" && (
             <div className="mt-4 inline-flex items-center gap-2 rounded-md bg-accent px-3 py-1.5 text-xs">
               <Loader2 className="h-3 w-3 animate-spin" /> Drafting plan…
+            </div>
+          )}
+          {tier !== "elite" && (
+            <div className="mt-8 max-w-md mx-auto">
+              <LockedFeature
+                required={tier === "pro" ? "elite" : "pro"}
+                feature={tier === "pro" ? "Heavy depth — 8 sub-questions, ~7k word memos" : "Deep & Heavy depth"}
+                description={tier === "pro"
+                  ? "Elite gives you the full investigative depth — 8 parallel sub-questions, contrarian analysis, and analyst-grade synthesis."
+                  : "Pro unlocks Deep depth (3+ sub-questions, balanced reports). Elite unlocks Heavy — 8 sub-questions, contrarian analysis, ~7k words."}
+              />
             </div>
           )}
         </div>

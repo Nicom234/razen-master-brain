@@ -40,48 +40,61 @@ function Tiers() {
     {
       name: "Free",
       price: "$0",
-      tagline: "Try every mode. No card.",
+      tagline: "Try the four modes. Hit the ceiling fast.",
       cta: { label: "Start free", to: "/signup" as const },
       tone: "card",
+      limits: "25 credits / day · Quick scan only · No memory",
       features: [
         "All four modes — Research, Write, Plan, Build",
-        "Generous monthly credits, refilled each period",
-        "Web research with citations, document uploads",
-        "Public share links · Markdown export",
+        "Quick scan research depth (3 sub-questions, ~1k word memos)",
+        "Public share links and Markdown export",
+        "Web search with cited sources",
+      ],
+      missing: [
+        "No long-term memory",
+        "No file uploads (PDFs, images)",
+        "Build Studio basics only — no fork, no snapshots",
+        "No deep research depth",
       ],
     },
     {
       name: "Pro",
       price: "$20",
       cadence: "/mo",
-      tagline: "For operators who use Razen daily.",
+      tagline: "For operators using Razen as their daily driver.",
       cta: { label: "Upgrade to Pro", to: "/pricing" as const },
       tone: "primary",
       badge: "Most popular",
+      limits: "10× credits · Memory · Build Studio · Files",
       features: [
-        "10× the credits — power-user volume",
-        "Long-term memory across every chat",
-        "Build Studio: live preview, file tree, ZIP export",
-        "Version history with one-click restore",
-        "Priority routing — first-class queue",
-        "Up to 30MB documents, 50-page PDFs",
+        "10× more credits — never run out mid-task",
+        "Long-term memory — Razen remembers your role, projects, voice",
+        "Full Build Studio: live preview, multi-file, ZIP export, fork, snapshots, auto-fix-errors",
+        "Deep research depth (6 sub-questions, ~3.5k word memos)",
+        "File uploads — 30MB PDFs, screenshots, contracts",
+        "Priority routing — first-class queue, faster responses",
+        "Plan workspace: Kanban + Calendar + AI Monday standup",
       ],
+      missing: [],
     },
     {
       name: "Elite",
       price: "$60",
       cadence: "/mo",
-      tagline: "Unlimited brain, agentic work.",
+      tagline: "Built for the work that ships products and changes outcomes.",
       cta: { label: "Go Elite", to: "/pricing" as const },
       tone: "dark",
+      limits: "Highest ceiling · Frontier models · Heavy depth",
       features: [
         "Everything in Pro, with the highest credit ceiling",
-        "Frontier reasoning models routed automatically",
-        "Build: forks, snapshots, auto-fix-errors, Cmd-K palette",
-        "Research: deeper agent depth, more parallel sub-questions",
-        "Plan: AI standup memo, calendar+kanban+outline views",
-        "Early access to new modes, agents and integrations",
+        "Frontier reasoning routed automatically — heavier models for heavier tasks",
+        "Heavy research depth: 8 parallel sub-questions, ~7k word analyst memos",
+        "Build Studio: command palette, larger context, version forks, deeper iteration",
+        "Plan workspace: AI risk analysis, dependency mapping, decision log",
+        "Write: full voice library, unlimited ghost-text autocomplete",
+        "Early access to new modes, agents, and integrations",
       ],
+      missing: [],
     },
   ];
   return (
@@ -127,7 +140,14 @@ function Tiers() {
                 </div>
                 <p className={`mt-2 text-sm ${isDark ? "text-background/70" : "text-muted-foreground"}`}>{t.tagline}</p>
 
-                <ul className="mt-6 space-y-2.5 text-sm">
+                {/* Quick limits/highlights badge */}
+                <div className={`mt-4 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${
+                  isDark ? "border-primary/40 bg-primary/10 text-primary" : isPrimary ? "border-primary/40 bg-primary/10 text-primary" : "border-border/60 bg-background/60 text-muted-foreground"
+                }`}>
+                  {t.limits}
+                </div>
+
+                <ul className="mt-5 space-y-2.5 text-sm">
                   {t.features.map((f) => (
                     <li key={f} className="flex items-start gap-2.5">
                       <Check className={`mt-0.5 h-4 w-4 shrink-0 ${isDark ? "text-primary" : isPrimary ? "text-primary" : "text-foreground/70"}`} />
@@ -135,6 +155,17 @@ function Tiers() {
                     </li>
                   ))}
                 </ul>
+
+                {t.missing.length > 0 && (
+                  <ul className={`mt-3 space-y-1.5 text-[12px] ${isDark ? "text-background/55" : "text-muted-foreground"}`}>
+                    {t.missing.map((m) => (
+                      <li key={m} className="flex items-start gap-2.5">
+                        <Minus className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-50" />
+                        <span className="opacity-75">{m}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
                 <div className="mt-8 pt-4">
                   <Link to={t.cta.to} className="block">
@@ -156,8 +187,23 @@ function Tiers() {
           })}
         </div>
 
+        {/* Specific use-case proof */}
+        <div className="mt-12 grid gap-4 md:grid-cols-3">
+          {[
+            { who: "Founders & operators", w: "Pro", reason: "Ship products faster — Build Studio + memory + deep research." },
+            { who: "Analysts & researchers", w: "Elite", reason: "8-source parallel research, ~7k word memos with citations and contrarian analysis." },
+            { who: "Marketing & content", w: "Pro", reason: "Voice library, ghost-text autocomplete, version history. Notion AI replaced." },
+          ].map((c) => (
+            <div key={c.who} className="rounded-xl border border-border/70 bg-card/50 p-4 text-sm">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{c.who}</div>
+              <div className="mt-1 font-semibold text-foreground">→ {c.w}</div>
+              <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{c.reason}</p>
+            </div>
+          ))}
+        </div>
+
         <p className="mt-8 text-center text-xs text-muted-foreground">
-          Cancel any time. Annual billing saves ~20%. Team plans available — <Link to="/pricing" className="underline hover:text-foreground">see pricing</Link>.
+          Cancel any time. Annual billing saves ~20%. 14-day money-back guarantee. Team plans available — <Link to="/pricing" className="underline hover:text-foreground">see pricing</Link>.
         </p>
       </div>
     </section>

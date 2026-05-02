@@ -280,9 +280,11 @@ const SAMPLE_PROMPTS = [
 interface PlanWorkspaceProps {
   onCreditsChange?: (n: number) => void;
   onRefresh?: () => void;
+  tier?: "free" | "pro" | "elite";
 }
 
-export function PlanWorkspace({ onCreditsChange, onRefresh: _onRefresh }: PlanWorkspaceProps) {
+export function PlanWorkspace({ onCreditsChange, onRefresh: _onRefresh, tier = "free" }: PlanWorkspaceProps) {
+  void tier;
   const [goal, setGoal] = useState("");
   const [plan, setPlan] = useState<Plan>(EMPTY);
   const [loading, setLoading] = useState(false);

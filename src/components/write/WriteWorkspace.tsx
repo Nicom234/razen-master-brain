@@ -134,6 +134,7 @@ interface WriteWorkspaceProps {
   onCreditsChange: (n: number) => void;
   selectedId?: string | null;
   onRefresh?: () => void;
+  tier?: "free" | "pro" | "elite";
 }
 
 // Hook: drive ghost-text autocomplete. Watches editor for ~700ms idle moments
@@ -247,7 +248,7 @@ function useGhostText(editor: Editor | null, enabled: boolean, onCreditsChange: 
   }, [editor, enabled, onCreditsChange]);
 }
 
-export function WriteWorkspace({ onCreditsChange, selectedId, onRefresh }: WriteWorkspaceProps) {
+export function WriteWorkspace({ onCreditsChange, selectedId, onRefresh, tier = "free" }: WriteWorkspaceProps) {
   const [docs, setDocs] = useState<Doc[]>(() => loadDocs());
   const [activeId, setActiveId] = useState<string | null>(() => loadDocs()[0]?.id ?? null);
   const [busy, setBusy] = useState<WriteAction | null>(null);

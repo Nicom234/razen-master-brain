@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { stripeEnv } from "@/lib/stripe";
 import { MemoryPanel } from "@/components/MemoryPanel";
+import { UpgradeBanner, OutOfCreditsModal } from "@/components/UpgradeBanner";
 import { WriteWorkspace } from "@/components/write/WriteWorkspace";
 import { PlanWorkspace } from "@/components/plan/PlanWorkspace";
 import { ResearchLab } from "@/components/research/ResearchLab";
@@ -101,7 +102,19 @@ function AppPage() {
   const [memOpen, setMemOpen] = useState(false);
   const [wsSessions, setWsSessions] = useState<WsSession[]>([]);
   const [wsActiveId, setWsActiveId] = useState<string | null>(null);
+  const [outOfCreditsOpen, setOutOfCreditsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Show out-of-credits modal when free user hits 0 (only once per session).
+  useEffect(() => {
+    if (tier === "free" && credits !== null && credits <= 0) {
+      const seen = sessionStorage.getItem("razen.ooc.seen");
+      if (!seen) {
+        setOutOfCreditsOpen(true);
+        sessionStorage.setItem("razen.ooc.seen", "1");
+      }
+    }
+  }, [tier, credits]);
 
   const refreshWsSessions = useCallback(() => {
     if (mode !== "plan") {
@@ -511,9 +524,11 @@ function AppPage() {
       </aside>
 
       {memOpen && user && <MemoryPanel userId={user.id} tier={tier} onClose={() => setMemOpen(false)} />}
+      <OutOfCreditsModal open={outOfCreditsOpen} onClose={() => setOutOfCreditsOpen(false)} />
 
       {/* Main */}
       <div className="flex flex-1 flex-col">
+        <UpgradeBanner tier={tier} credits={credits} monthlyGrant={monthlyGrant} />
         <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-md md:px-6">
           <div className="flex items-center gap-2">
             {/* Mode picker */}
@@ -570,9 +585,10 @@ function AppPage() {
             onCreditsChange={setCredits}
             selectedId={wsActiveId}
             onRefresh={refreshWsSessions}
+            tier={tier}
           />
         ) : mode === "plan" ? (
-          <PlanWorkspace onCreditsChange={setCredits} onRefresh={refreshWsSessions} />
+          <PlanWorkspace onCreditsChange={setCredits} onRefresh={refreshWsSessions} tier={tier} />
         ) : mode === "research" ? (
           <ResearchLab
             onCreditsChange={setCredits}
