@@ -123,15 +123,27 @@ function newInvestigation(query = ""): Investigation {
 }
 
 // ---------- model calls ----------
-async function callChat(messages: { role: string; content: string }[], useWebSearch: boolean): Promise<{ content: string; credits: number | null }> {
+type Focus = "web" | "academic" | "news" | "reddit";
+const FOCUS_PRIME: Record<Focus, string> = {
+  web: "",
+  academic: "Prioritise peer-reviewed academic sources, journals, scholar.google, ArXiv, SSRN, university research, and primary literature. When citing, prefer DOIs and journal links over blog posts.",
+  news: "Prioritise recent news coverage, reporting from established outlets (Reuters, FT, NYT, The Economist, Bloomberg, etc.), and dated sources. Note publication dates in citations and surface very recent developments.",
+  reddit: "Prioritise real-user discussions, Reddit threads, Hacker News, forums, and community sentiment. Pull representative quotes (with attribution). Surface contrarian or minority views explicitly.",
+};
+
+async function callChat(messages: { role: string; content: string }[], useWebSearch: boolean, focus: Focus = "web"): Promise<{ content: string; credits: number | null }> {
   const { data: { session } } = await supabase.auth.getSession();
+  // Inject focus context as a leading system note if non-default.
+  const finalMessages = focus !== "web" && FOCUS_PRIME[focus]
+    ? [{ role: "system", content: `Search focus: ${focus}. ${FOCUS_PRIME[focus]}` }, ...messages]
+    : messages;
   const res = await fetch(FN_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
     },
-    body: JSON.stringify({ messages, mode: "research", useWebSearch }),
+    body: JSON.stringify({ messages: finalMessages, mode: "research", useWebSearch }),
   });
   if (!res.ok) throw new Error(`Chat failed: ${res.status}`);
   const credHeader = res.headers.get("X-Credits-Remaining");
@@ -228,6 +240,7 @@ export function ResearchLab({ onCreditsChange, onExitResearch, tier = "free", se
   });
   const [input, setInput] = useState("");
   const [depth, setDepth] = useState<Depth>(3);
+  const [focus, setFocus] = useState<"web" | "academic" | "news" | "reddit">("web");
   const [phase, setPhase] = useState<"idle" | "triage" | "quick" | "planning" | "investigating" | "synthesizing">("idle");
   const [now, setNow] = useState(Date.now());
   const [tab, setTab] = useState<"plan" | "subs" | "sources" | "report" | "activity" | "notes">("plan");
@@ -372,6 +385,7 @@ Rules:
         const { content, credits } = await callChat(
           [{ role: "system", content: sys }, { role: "user", content: `Question: ${sub.question}\n\nContext / why we care: ${sub.angle ?? "n/a"}\n\nQuery for the broader investigation: ${active.query}` }],
           true,
+          focus,
         );
         if (credits !== null) onCreditsChange(credits);
         const sources = extractSources(content, sub.id);
@@ -507,6 +521,7 @@ Rules:
       const { content, credits } = await callChat(
         [{ role: "system", content: sys }, { role: "user", content: query }],
         true,
+        focus,
       );
       if (credits !== null) onCreditsChange(credits);
       const sources = extractSources(content, "quick");
@@ -620,6 +635,30 @@ Rules:
         {/* Composer */}
         <div className="border-t border-border/60 bg-card/30 p-3">
           <div className="mx-auto max-w-4xl">
+            {/* Focus pills — Perplexity-style search modes */}
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mr-1">Focus</span>
+              {[
+                { id: "web", label: "Web", hint: "Default — broad web search" },
+                { id: "academic", label: "Academic", hint: "Peer-reviewed, journals, scholar.google" },
+                { id: "news", label: "News", hint: "Recent news + reporting" },
+                { id: "reddit", label: "Reddit", hint: "Real-user discussions, sentiment" },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setFocus(f.id as typeof focus)}
+                  disabled={phase !== "idle"}
+                  title={f.hint}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-medium transition ${
+                    focus === f.id
+                      ? "bg-foreground text-background"
+                      : "border border-border/60 bg-background/60 text-muted-foreground hover:bg-card hover:text-foreground"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
             <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px]">
               <span className="font-semibold uppercase tracking-wider text-muted-foreground">Depth</span>
               <input

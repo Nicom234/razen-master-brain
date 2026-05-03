@@ -6,7 +6,7 @@ import {
   Layout, Gamepad2, BarChart3, Newspaper, ShoppingBag, BookOpen, Smartphone,
   Globe, Zap, Rocket, ChevronRight, Hammer, ArrowLeft,
   Monitor, Tablet, Maximize2, Minimize2, Brain, Workflow,
-  History, GitFork, Wrench, RotateCcw,
+  History, GitFork, Wrench, RotateCcw, MousePointer2, ListTodo,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -145,6 +145,9 @@ function buildSrcDoc(files: FileMap): string {
   );
 
   // Append console hook + uncaught error reporter so the workspace can surface issues.
+  // Plus the click-to-edit element inspector — when the parent toggles inspect
+  // mode on, clicks in the iframe are captured and reported back as a stable
+  // CSS selector + element metadata, never propagated to the actual element.
   const hook = `<script data-razen="hook">(function(){
     var send=function(kind,args){try{window.parent.postMessage({__razen:true,kind:kind,msg:Array.prototype.slice.call(args).map(function(a){try{return typeof a==='string'?a:JSON.stringify(a)}catch(_e){return String(a)}}).join(' ')},'*')}catch(_e){}};
     var orig={log:console.log,warn:console.warn,error:console.error,info:console.info};
@@ -154,6 +157,53 @@ function buildSrcDoc(files: FileMap): string {
     console.info=function(){send('info',arguments);orig.info.apply(console,arguments)};
     window.addEventListener('error',function(e){try{window.parent.postMessage({__razen:true,kind:'error',msg:String(e.message||e.error||e),stack:String((e.error&&e.error.stack)||'')},'*')}catch(_e){}});
     window.addEventListener('unhandledrejection',function(e){try{window.parent.postMessage({__razen:true,kind:'error',msg:'Unhandled: '+String(e.reason&&e.reason.message||e.reason)},'*')}catch(_e){}});
+
+    /* ── Click-to-edit element inspector ── */
+    var __inspect=false;
+    var __hover=null;
+    var styleEl=document.createElement('style');
+    styleEl.textContent='.__razen-hover{outline:2px solid #f97316!important;outline-offset:2px!important;cursor:crosshair!important;background:rgba(249,115,22,0.08)!important}.__razen-cursor *{cursor:crosshair!important}';
+    document.head.appendChild(styleEl);
+    function buildSelector(el){
+      if(!el||el===document.body)return 'body';
+      if(el.id) return '#'+el.id;
+      var path=[];
+      var cur=el;
+      while(cur&&cur!==document.body&&path.length<5){
+        var name=cur.tagName.toLowerCase();
+        if(cur.className&&typeof cur.className==='string'){
+          var cls=cur.className.trim().split(/\\s+/).filter(function(c){return c&&!c.startsWith('__razen')}).slice(0,2);
+          if(cls.length)name+='.'+cls.join('.');
+        }
+        var sib=cur.parentNode?Array.prototype.indexOf.call(cur.parentNode.children,cur):0;
+        if(sib>0&&!cur.id)name+=':nth-child('+(sib+1)+')';
+        path.unshift(name);
+        cur=cur.parentNode;
+      }
+      return path.join(' > ');
+    }
+    window.addEventListener('message',function(e){
+      if(e.data&&e.data.__razenInspect!==undefined){
+        __inspect=!!e.data.__razenInspect;
+        if(__inspect)document.body.classList.add('__razen-cursor');
+        else{document.body.classList.remove('__razen-cursor');if(__hover)__hover.classList.remove('__razen-hover');__hover=null;}
+      }
+    });
+    document.addEventListener('mouseover',function(e){
+      if(!__inspect)return;
+      if(__hover)__hover.classList.remove('__razen-hover');
+      __hover=e.target;
+      __hover.classList.add('__razen-hover');
+    },true);
+    document.addEventListener('click',function(e){
+      if(!__inspect)return;
+      e.preventDefault();e.stopPropagation();
+      var el=e.target;
+      try{
+        var text=(el.innerText||el.textContent||'').trim().slice(0,100);
+        window.parent.postMessage({__razen:true,kind:'inspect',selector:buildSelector(el),tag:el.tagName.toLowerCase(),text:text,classes:String(el.className||'').slice(0,200)},'*');
+      }catch(_e){}
+    },true);
   })();<\/script>`;
   if (/<\/head>/i.test(doc)) doc = doc.replace(/<\/head>/i, hook + "</head>");
   else doc = hook + doc;
@@ -236,6 +286,8 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange, selecte
   const [model, setModel] = useState<string | null>(null);
   const [fullscreenPreview, setFullscreenPreview] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [inspectMode, setInspectMode] = useState(false);
+  const [selectedEl, setSelectedEl] = useState<{ selector: string; tag: string; text: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const initialPromptRef = useRef<HTMLTextAreaElement>(null);
   const iterRef = useRef<HTMLTextAreaElement>(null);
@@ -260,16 +312,26 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange, selecte
     else setSelectedFile(null);
   }, [fileList, selectedFile, allFiles]);
 
-  // Listen to iframe console + errors.
+  // Listen to iframe console + errors + element-inspector events.
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       const d = e.data;
       if (!d || typeof d !== "object" || !d.__razen) return;
+      if (d.kind === "inspect") {
+        setSelectedEl({ selector: String(d.selector || ""), tag: String(d.tag || ""), text: String(d.text || "") });
+        setInspectMode(false);
+        return;
+      }
       setConsoleEntries((arr) => [...arr.slice(-200), { kind: String(d.kind || "log"), msg: String(d.msg || ""), ts: Date.now() }]);
     }
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
   }, []);
+
+  // Push inspect-mode changes into the iframe.
+  useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage({ __razenInspect: inspectMode }, "*");
+  }, [inspectMode]);
 
   // Persist projects on change.
   useEffect(() => { saveProjects(projects); }, [projects]);
@@ -452,9 +514,17 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange, selecte
     if (!active || streaming) return;
     const text = prompt.trim();
     if (!text) return;
+    // If an element is selected, pin its reference to the prompt so the model
+    // can target it precisely. This is the click-to-edit primitive.
+    let finalPrompt = text;
+    if (selectedEl) {
+      const ref = `the ${selectedEl.tag} element matching selector \`${selectedEl.selector}\`${selectedEl.text ? ` (containing the text "${selectedEl.text}")` : ""}`;
+      finalPrompt = `${text}\n\nApply this change specifically to ${ref}. If the selector no longer matches after the change, prefer the visually equivalent element.`;
+    }
     setIterInput("");
-    void stream({ project: active, userPrompt: text, iteration: true });
-  }, [active, streaming, stream]);
+    setSelectedEl(null);
+    void stream({ project: active, userPrompt: finalPrompt, iteration: true });
+  }, [active, streaming, stream, selectedEl]);
 
   // ──────────────────────────── ZIP export ─────────────────────────
   const exportZip = async () => {
@@ -597,6 +667,15 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange, selecte
                 <DeviceBtn icon={Smartphone} active={device === "mobile"} onClick={() => setDevice("mobile")} title="Mobile" />
               </div>
               <Button
+                variant={inspectMode ? "default" : "ghost"} size="sm"
+                className={`h-8 gap-1 px-2 ${inspectMode ? "bg-primary text-primary-foreground" : ""}`}
+                title="Click any element in the preview, then describe the change"
+                onClick={() => setInspectMode((v) => !v)}
+              >
+                <MousePointer2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">{inspectMode ? "Inspecting" : "Inspect"}</span>
+              </Button>
+              <Button
                 variant="ghost" size="sm" className="h-8 px-2"
                 title={fullscreenPreview ? "Exit fullscreen" : "Fullscreen preview"}
                 onClick={() => setFullscreenPreview((v) => !v)}
@@ -661,13 +740,31 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange, selecte
 
           {/* Iteration composer */}
           <div className="border-t border-border/60 bg-card/40 p-3">
+            {selectedEl && (
+              <div className="mb-2 flex items-center gap-2 rounded-lg border border-orange-500/30 bg-orange-500/5 px-2.5 py-1.5">
+                <MousePointer2 className="h-3 w-3 shrink-0 text-orange-600 dark:text-orange-400" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">Targeting</div>
+                  <div className="truncate font-mono text-[11px] text-foreground">
+                    &lt;{selectedEl.tag}&gt;{selectedEl.text ? ` "${selectedEl.text.slice(0, 40)}"` : ""}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedEl(null)}
+                  className="grid h-5 w-5 place-items-center rounded text-muted-foreground hover:bg-orange-500/10"
+                  title="Clear selection"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
             <div className="rounded-xl border border-border/70 bg-background shadow-soft transition focus-within:border-primary/40">
               <textarea
                 ref={iterRef}
                 value={iterInput}
                 onChange={(e) => setIterInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); iterate(iterInput); } }}
-                placeholder="Refine — e.g. 'add a dark theme toggle and a pricing FAQ'"
+                placeholder={selectedEl ? "Describe the change for this element…" : "Refine — e.g. 'add a dark theme toggle and a pricing FAQ'"}
                 rows={2}
                 disabled={streaming}
                 className="w-full resize-none border-0 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground/70"
@@ -1008,6 +1105,23 @@ function ChatBubble({ msg }: { msg: ChatMsg }) {
   );
 }
 
+// Parse the model's plan into 3-6 concrete tasks for the agent task list.
+// Splits on sentence/clause boundaries and verb-led phrases.
+function planToTasks(plan: string | undefined): string[] {
+  if (!plan) return [];
+  // Try numbered or bulleted lists first.
+  const listMatch = plan.match(/(?:^|\n)\s*[-*•0-9]+[.)\s]+([^\n]+)/g);
+  if (listMatch && listMatch.length >= 2) {
+    return listMatch
+      .map((m) => m.replace(/^[\s\-*•0-9.)]+/, "").trim())
+      .filter((s) => s.length > 5 && s.length < 120)
+      .slice(0, 6);
+  }
+  // Fall back to splitting on commas / sentences.
+  const parts = plan.split(/[.;,]\s+/).map((p) => p.trim()).filter((p) => p.length > 8 && p.length < 100);
+  return parts.slice(0, 5);
+}
+
 function StreamingBubble({ plan, files, active }: { plan?: string; files: string[]; active?: string | null }) {
   // Surface a structured agent timeline so the user can see what's happening
   // — design → wire → ship — instead of a single "loading" bubble.
@@ -1018,6 +1132,10 @@ function StreamingBubble({ plan, files, active }: { plan?: string; files: string
     { key: "polish", label: "Polishing", sub: "States · responsiveness · finish", icon: Sparkles },
   ];
   const stageIdx = stages.findIndex((s) => s.key === stage);
+  const tasks = planToTasks(plan);
+  // Approximate progress per task: completed if a related file has been emitted.
+  const completedRatio = tasks.length === 0 ? 0 : Math.min(1, files.length / Math.max(tasks.length, 3));
+  const tasksDone = Math.floor(completedRatio * tasks.length);
   return (
     <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent shadow-soft">
       <div className="flex items-center gap-1.5 border-b border-primary/15 bg-primary/5 px-3 py-1.5 text-[11px] font-medium text-primary">
@@ -1052,6 +1170,34 @@ function StreamingBubble({ plan, files, active }: { plan?: string; files: string
             );
           })}
         </div>
+        {/* Agent task list — parsed from plan, checked off as files complete */}
+        {tasks.length > 0 && (
+          <div className="mt-3 rounded-lg border border-border/40 bg-background/50 p-3">
+            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <ListTodo className="h-3 w-3" /> Tasks · {tasksDone}/{tasks.length}
+            </div>
+            <div className="space-y-1.5">
+              {tasks.map((t, i) => {
+                const done = i < tasksDone;
+                const current = i === tasksDone && !!active;
+                return (
+                  <div key={i} className="flex items-start gap-2 text-[12px]">
+                    {done ? (
+                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                    ) : current ? (
+                      <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
+                    ) : (
+                      <div className="mt-1 h-3 w-3 shrink-0 rounded-full border border-border/60" />
+                    )}
+                    <span className={`leading-relaxed ${done ? "line-through opacity-60" : current ? "text-foreground" : "text-muted-foreground"}`}>
+                      {t}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {/* File trail */}
         {(files.length > 0 || active) && (
           <div className="mt-3 space-y-1">
