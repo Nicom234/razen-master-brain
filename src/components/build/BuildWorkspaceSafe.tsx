@@ -341,8 +341,15 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange, selecte
     if (selectedId === null) {
       setActiveId(null); // "New build" → show landing
     } else if (selectedId && selectedId !== activeId) {
+      // Abort any in-progress stream before switching projects.
+      abortRef.current?.abort();
+      setStreaming(false);
+      setActiveStream(null);
+      setStreamBuf("");
       setActiveId(selectedId);
       setView("preview");
+      setSelectedFile(null);
+      setConsoleEntries([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
@@ -719,7 +726,7 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange, selecte
       </div>
 
       <div className="flex flex-1 min-h-0">
-        {/* Chat / iteration sidebar — hidden in fullscreen preview */}
+        {/* Chat / iteration sidebar — always flex on desktop; on mobile shown as bottom sheet via separate bar */}
         <aside className={`${fullscreenPreview && view === "preview" ? "hidden" : "hidden lg:flex"} w-[340px] shrink-0 flex-col border-r border-border/60 bg-card/30`}>
           <div ref={chatScrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
             {active.messages.length === 0 && !streaming && (
@@ -806,9 +813,7 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange, selecte
 
         {/* Main pane */}
         <main className="relative flex flex-1 min-w-0 flex-col">
-          {fileList.length === 0 && streaming ? (
-            <FirstRunSkeleton plan={activeStream?.plan} active={activeStream?.activePath} />
-          ) : view === "preview" ? (
+          {view === "preview" ? (
             <PreviewPane
               srcDoc={srcDoc}
               iframeKey={iframeKey}
@@ -837,6 +842,15 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange, selecte
             />
           )}
 
+          {/* Agent-steps overlay — replaces FirstRunSkeleton so the preview pane is
+              never unmounted. Fades over the empty preview while the first build runs,
+              disappears the moment the first file is written. */}
+          {streaming && fileList.length === 0 && view === "preview" && (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-b from-background/95 via-background/90 to-card/80 backdrop-blur-[3px]">
+              <AgentStepsOverlay plan={activeStream?.plan} active={activeStream?.activePath} />
+            </div>
+          )}
+
           {/* Inline auto-fix banner — surface across any tab while errors exist */}
           {view !== "console" && errorCount > 0 && !streaming && (
             <button
@@ -858,6 +872,43 @@ export function BuildWorkspaceSafe({ tier, onExitBuild, onCreditsChange, selecte
             onClose={() => setHistoryOpen(false)}
             onRestore={restoreSnapshot}
           />
+        )}
+      </div>
+
+      {/* Mobile iteration bar — visible only below lg breakpoint where the sidebar is hidden.
+          Keeps the composer accessible on phones and tablets. */}
+      <div className={`lg:hidden ${fullscreenPreview && view === "preview" ? "hidden" : ""} border-t border-border/60 bg-card/40 px-3 py-2`}>
+        {streaming ? (
+          <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            <span>{activeStream?.activePath ? `Writing ${activeStream.activePath}` : (activeStream?.plan ? activeStream.plan.slice(0, 60) + "…" : "Razen is building…")}</span>
+            <button onClick={stopStream} className="ml-auto rounded border border-border/70 bg-background px-2 py-1 text-[11px]">Stop</button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            {selectedEl && (
+              <div className="flex items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/5 px-2 py-1 text-[11px] text-orange-600">
+                <MousePointer2 className="h-3 w-3" />
+                <span className="max-w-[100px] truncate">&lt;{selectedEl.tag}&gt;</span>
+                <button onClick={() => setSelectedEl(null)}><X className="h-3 w-3" /></button>
+              </div>
+            )}
+            <div className="flex flex-1 items-center gap-2 rounded-xl border border-border/70 bg-background px-3 py-2 shadow-soft focus-within:border-primary/40">
+              <textarea
+                value={iterInput}
+                onChange={(e) => setIterInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); iterate(iterInput); } }}
+                placeholder="Refine or add to this build…"
+                rows={1}
+                disabled={streaming}
+                className="flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
+                style={{ maxHeight: "80px" }}
+              />
+              <Button size="icon" className="h-7 w-7 shrink-0 rounded-full" onClick={() => iterate(iterInput)} disabled={!iterInput.trim() || streaming}>
+                <ArrowUp className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -1215,6 +1266,64 @@ function StreamingBubble({ plan, files, active }: { plan?: string; files: string
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Non-destructive agent steps overlay for first build — shown OVER the preview
+// pane so the iframe is never unmounted. Disappears as soon as the first file appears.
+function AgentStepsOverlay({ plan, active }: { plan?: string; active?: string | null }) {
+  const stages = [
+    { label: "Planning architecture", icon: Brain },
+    { label: "Writing files", icon: FileCode },
+    { label: "Wiring interactions", icon: Workflow },
+  ] as const;
+  const stageIdx = !plan ? 0 : active ? 1 : 2;
+  return (
+    <div className="w-full max-w-md px-4 text-center">
+      {/* Animated icon */}
+      <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-foreground text-background shadow-card">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+      <h3 className="mt-5 font-display text-2xl">Building…</h3>
+      {plan ? (
+        <p className="mt-2 text-sm text-muted-foreground line-clamp-3">{plan}</p>
+      ) : (
+        <p className="mt-2 text-sm text-muted-foreground">Razen is planning the architecture and visual direction…</p>
+      )}
+      {active && (
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/90 px-3 py-1.5 text-xs font-mono shadow-soft">
+          <FileCode className="h-3 w-3 text-primary" />
+          writing <span className="text-foreground">{active}</span>
+        </div>
+      )}
+      {/* Stage rail */}
+      <div className="mt-6 flex items-stretch gap-2">
+        {stages.map((s, i) => {
+          const Icon = s.icon;
+          const done = i < stageIdx;
+          const current = i === stageIdx;
+          return (
+            <div
+              key={s.label}
+              className={`flex flex-1 flex-col items-center gap-1.5 rounded-xl border p-2.5 transition ${
+                current ? "border-primary/40 bg-primary/10" : done ? "border-primary/20 bg-background/60" : "border-border/50 bg-background/30"
+              }`}
+            >
+              {done ? (
+                <Check className="h-4 w-4 text-primary" />
+              ) : current ? (
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              ) : (
+                <Icon className={`h-4 w-4 ${current ? "text-primary" : "text-muted-foreground"}`} />
+              )}
+              <span className={`text-center text-[10px] leading-tight ${current ? "font-semibold text-foreground" : done ? "text-foreground/80" : "text-muted-foreground"}`}>
+                {s.label}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
