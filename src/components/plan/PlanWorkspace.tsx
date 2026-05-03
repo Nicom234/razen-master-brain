@@ -279,9 +279,11 @@ const SAMPLE_PROMPTS = [
 
 interface PlanWorkspaceProps {
   onCreditsChange?: (n: number) => void;
+  onRefresh?: () => void;
+  tier?: "free" | "pro" | "elite";
 }
 
-export function PlanWorkspace({ onCreditsChange }: PlanWorkspaceProps) {
+export function PlanWorkspace({ onCreditsChange, onRefresh: _onRefresh, tier: _tier = "free" }: PlanWorkspaceProps) {
   const [goal, setGoal] = useState("");
   const [plan, setPlan] = useState<Plan>(EMPTY);
   const [loading, setLoading] = useState(false);
@@ -603,14 +605,9 @@ export function PlanWorkspace({ onCreditsChange }: PlanWorkspaceProps) {
             </div>
           </div>
 
-          {/* loading skeleton / streaming raw preview */}
+          {/* AI generation state */}
           {loading && (
-            <div className="mt-6 rounded-2xl border bg-muted/30 p-5">
-              <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
-                <Loader2 className="h-3 w-3 animate-spin" /> Streaming…
-              </div>
-              <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">{raw || "Thinking…"}</pre>
-            </div>
+            <PlanGeneratingState goal={goal} raw={raw} onCancel={() => { abortRef.current?.abort(); }} />
           )}
 
           {/* capability strip */}
@@ -1162,5 +1159,104 @@ function ViewBtn({ icon: Icon, label, active, onClick }: { icon: typeof Layout; 
     </button>
   );
 }
+// ─── Plan generating state ────────────────────────────────────────────────────
+function PlanGeneratingState({ goal, raw, onCancel }: { goal: string; raw: string; onCancel: () => void }) {
+  const [stepVisible, setStepVisible] = useState(0);
+  const STEPS = [
+    "Analysing goal and constraints",
+    "Mapping milestone structure",
+    "Writing atomic verb-led tasks",
+    "Assigning priorities and owners",
+    "Estimating realistic due dates",
+    "Identifying risks and blockers",
+    "Defining success criteria",
+  ];
+  useEffect(() => {
+    const id = setInterval(() => setStepVisible((s) => Math.min(s + 1, STEPS.length)), 750);
+    return () => clearInterval(id);
+  }, [STEPS.length]);
+
+  const milestonesFound = useMemo(() => {
+    // Each milestone has a "title" field — count them (subtract 1 to exclude the root "objective"-level title-likes)
+    const hits = raw.match(/"title"\s*:\s*"[^"]{3,}"/g);
+    return hits ? Math.max(0, hits.length - 1) : 0;
+  }, [raw]);
+
+  const activeStep = Math.min(stepVisible, STEPS.length - 1);
+
+  return (
+    <div className="mt-8 rounded-3xl border border-primary/20 bg-card shadow-card overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 border-b border-border/40 bg-primary/5 px-5 py-4">
+        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <span className="absolute inset-0 animate-ping rounded-full bg-primary/20 opacity-75" />
+        </div>
+        <div>
+          <div className="text-sm font-semibold">Building your plan…</div>
+          <div className="text-xs text-muted-foreground">
+            {milestonesFound > 0
+              ? `${milestonesFound} milestone${milestonesFound > 1 ? "s" : ""} discovered so far`
+              : "Decomposing your goal into milestones"}
+          </div>
+        </div>
+      </div>
+
+      {/* Goal echo */}
+      <div className="border-b border-border/40 px-5 py-3 bg-muted/20">
+        <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-0.5">Your goal</div>
+        <div className="text-sm text-foreground/80 line-clamp-2">{goal}</div>
+      </div>
+
+      {/* Step rail */}
+      <div className="px-5 py-5 space-y-1">
+        {STEPS.map((label, i) => {
+          const done = i < activeStep;
+          const active = i === activeStep;
+          const hidden = i > activeStep + 2;
+          return (
+            <div
+              key={i}
+              style={{ transitionDelay: `${i * 50}ms` }}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all duration-500 ${
+                hidden ? "opacity-0 translate-y-1 pointer-events-none" :
+                done   ? "opacity-60" :
+                active ? "bg-primary/10 opacity-100" : "opacity-35"
+              }`}
+            >
+              <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all ${
+                done   ? "border-emerald-500 bg-emerald-500" :
+                active ? "border-primary bg-transparent" :
+                         "border-border/60 bg-muted/40"
+              }`}>
+                {done   && <Check className="h-3 w-3 text-white" />}
+                {active && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+              </div>
+              <span className={`text-sm transition-colors ${
+                done   ? "text-muted-foreground line-through" :
+                active ? "text-foreground font-medium" :
+                         "text-muted-foreground"
+              }`}>
+                {label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between border-t border-border/40 bg-background/40 px-5 py-3">
+        <div className="text-xs text-muted-foreground">Usually takes 10–20 seconds</div>
+        <button
+          onClick={onCancel}
+          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // silence unused-import lints if any
 void MoreHorizontal;

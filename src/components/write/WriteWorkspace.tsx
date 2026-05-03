@@ -132,6 +132,9 @@ function saveDocs(docs: Doc[]) {
 
 interface WriteWorkspaceProps {
   onCreditsChange: (n: number) => void;
+  selectedId?: string | null;
+  onRefresh?: () => void;
+  tier?: "free" | "pro" | "elite";
 }
 
 // Hook: drive ghost-text autocomplete. Watches editor for ~700ms idle moments
@@ -245,7 +248,7 @@ function useGhostText(editor: Editor | null, enabled: boolean, onCreditsChange: 
   }, [editor, enabled, onCreditsChange]);
 }
 
-export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
+export function WriteWorkspace({ onCreditsChange, selectedId, onRefresh, tier = "free" }: WriteWorkspaceProps) {
   const [docs, setDocs] = useState<Doc[]>(() => loadDocs());
   const [activeId, setActiveId] = useState<string | null>(() => loadDocs()[0]?.id ?? null);
   const [busy, setBusy] = useState<WriteAction | null>(null);
@@ -293,6 +296,35 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
       setDocs([d]); setActiveId(d.id);
     } else if (!activeId) setActiveId(docs[0].id);
   }, []); // eslint-disable-line
+
+  // Sync with parent-selected doc (from app.tsx sidebar).
+  useEffect(() => {
+    if (selectedId === null) {
+      // "New document" clicked in parent sidebar
+      newDoc();
+    } else if (selectedId && selectedId !== activeId) {
+      setActiveId(selectedId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  // Cmd+K opens the natural-language edit prompt — Cursor-style.
+  // Works on the current selection if any, otherwise on the whole doc.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCustomOpen(true);
+        // Focus the prompt input after the panel renders.
+        setTimeout(() => {
+          const inp = document.querySelector<HTMLInputElement>('[data-razen-cmdk]');
+          inp?.focus();
+        }, 50);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // autosave + version snapshots: every meaningful change captures a snapshot,
   // capped at 30 to keep storage sane. Old ones are evicted FIFO.
@@ -344,6 +376,7 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
     setDocs((ds) => { const n = [d, ...ds]; saveDocs(n); return n; });
     setActiveId(d.id);
     setTimeout(() => editor.commands.setContent(seed), 30);
+    setTimeout(() => onRefresh?.(), 150);
   };
 
   const deleteDoc = (id: string) => {
@@ -354,6 +387,7 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
       if (id === activeId) setActiveId(n[0]?.id ?? null);
       return n;
     });
+    setTimeout(() => onRefresh?.(), 150);
   };
 
   const renameDoc = (id: string, title: string) => {
@@ -521,6 +555,59 @@ export function WriteWorkspace({ onCreditsChange }: WriteWorkspaceProps) {
 
   return (
     <div className={`flex flex-1 min-h-0 ${focusMode ? "razen-focus-mode" : ""}`}>
+      {/* Cmd+K global edit modal — Cursor-style natural-language edits */}
+      {customOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-foreground/30 pt-32 backdrop-blur-sm" onClick={() => setCustomOpen(false)}>
+          <div
+            className="w-full max-w-xl rounded-2xl border border-border/70 bg-card shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {editor && editor.state.selection.from !== editor.state.selection.to
+                  ? "Edit selection"
+                  : "Edit document"}
+              </span>
+              <kbd className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">⌘K</kbd>
+            </div>
+            <input
+              data-razen-cmdk
+              type="text"
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && customPrompt.trim()) {
+                  void runAction("custom", { custom: customPrompt });
+                  setCustomOpen(false);
+                }
+                if (e.key === "Escape") setCustomOpen(false);
+              }}
+              placeholder="Make it sharper · Add concrete examples · Rewrite as a tweet thread …"
+              className="w-full border-0 bg-transparent px-4 py-4 text-base outline-none placeholder:text-muted-foreground/60"
+              autoFocus
+            />
+            <div className="flex flex-wrap gap-1.5 border-t border-border/60 bg-card/50 px-4 py-3">
+              {[
+                "Make it sharper",
+                "Cut 30%",
+                "Rewrite as a tweet thread",
+                "Add concrete examples",
+                "Make it more confident",
+                "Translate to French",
+              ].map((q) => (
+                <button
+                  key={q}
+                  onClick={() => { setCustomPrompt(q); }}
+                  className="rounded-full border border-border/60 bg-background/60 px-2.5 py-1 text-[11px] text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       {focusMode && (
         <style>{`
           .razen-focus-mode .razen-write-sidebar,
