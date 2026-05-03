@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
-import { Sparkles, X, Crown, ArrowRight, Lock, Zap, Brain, Rocket } from "lucide-react";
+import { Sparkles, X, Crown, ArrowRight, Lock, Zap, Brain, Rocket, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type Tier = "free" | "pro" | "elite";
@@ -46,11 +46,11 @@ export function UpgradeBanner({ tier, credits, monthlyGrant }: UpgradeBannerProp
           <Zap className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
           <p className="flex-1 truncate">
             <span className="font-semibold">You're out of credits.</span>{" "}
-            <span className="text-muted-foreground">Pro gives you 10× more, Elite gives you the highest ceiling.</span>
+            <span className="text-muted-foreground">Pro gives you 16× more — never run out mid-task.</span>
           </p>
           <Link to="/pricing">
             <Button size="sm" className="h-8 gap-1.5">
-              <Crown className="h-3.5 w-3.5" />Upgrade now
+              <Crown className="h-3.5 w-3.5" />Upgrade to Pro
             </Button>
           </Link>
           <button onClick={dismiss} className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-background">
@@ -67,12 +67,12 @@ export function UpgradeBanner({ tier, credits, monthlyGrant }: UpgradeBannerProp
         <div className="mx-auto flex max-w-6xl items-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 shrink-0 text-primary" />
           <p className="flex-1 truncate">
-            <span className="font-semibold">{credits} credits left.</span>{" "}
-            <span className="text-muted-foreground">Pro starts at $20 — 10× more credits, memory, and the full Build studio.</span>
+            <span className="font-semibold">Only {credits} credits left.</span>{" "}
+            <span className="text-muted-foreground">Pro · £29.99/mo · 400 credits, memory, full Build Studio.</span>
           </p>
           <Link to="/pricing">
             <Button size="sm" variant="default" className="h-8 gap-1.5">
-              See Pro <ArrowRight className="h-3.5 w-3.5" />
+              Upgrade <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </Link>
           <button onClick={dismiss} className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-background">
@@ -90,11 +90,11 @@ export function UpgradeBanner({ tier, credits, monthlyGrant }: UpgradeBannerProp
       <div className="mx-auto flex max-w-6xl items-center gap-3 text-sm">
         <Crown className="h-4 w-4 shrink-0 text-primary" />
         <p className="flex-1 truncate text-muted-foreground">
-          You're on <span className="font-medium text-foreground">Free</span>. Pro unlocks deeper research, the Build studio, memory, and 10× credits.
+          On <span className="font-medium text-foreground">Free</span> · Pro unlocks deep research, the Build Studio, memory, and 16× more credits.
         </p>
         <Link to="/pricing">
           <Button size="sm" variant="ghost" className="h-7 gap-1 px-2.5 text-xs hover:bg-primary/10 hover:text-primary">
-            See plans <ArrowRight className="h-3 w-3" />
+            See Pro <ArrowRight className="h-3 w-3" />
           </Button>
         </Link>
         <button onClick={dismiss} className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-background">
@@ -213,6 +213,112 @@ export function LockedFeature({ required, feature, description, compact }: Locke
             <Crown className="h-3.5 w-3.5" />Unlock
           </Button>
         </Link>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CreditMeter — sidebar credit progress bar with tier-aware copy.
+// Free: red/amber bar with "Get 16× more" CTA when usage > 50%.
+// Pro:  primary-orange bar + subtle Elite nudge.
+// Elite: violet/fuchsia bar — pure prestige.
+// ─────────────────────────────────────────────────────────────────────────────
+interface CreditMeterProps {
+  tier: Tier;
+  credits: number | null;
+  monthlyGrant: number;
+}
+
+export function CreditMeter({ tier, credits, monthlyGrant }: CreditMeterProps) {
+  if (credits === null) return null;
+  const used = Math.max(0, monthlyGrant - credits);
+  const pct = monthlyGrant > 0 ? Math.min(100, Math.round((used / monthlyGrant) * 100)) : 0;
+  const remainingPct = 100 - pct;
+
+  const barColor =
+    tier === "elite"
+      ? "from-violet-500 to-fuchsia-500"
+      : tier === "pro"
+      ? "from-primary to-orange-400"
+      : remainingPct > 50
+      ? "from-emerald-500 to-emerald-400"
+      : remainingPct > 20
+      ? "from-amber-500 to-orange-500"
+      : "from-rose-500 to-red-500";
+
+  const periodLabel = tier === "free" ? "today" : "this month";
+  const tierLabel = tier === "elite" ? "Elite" : tier === "pro" ? "Pro" : "Free";
+
+  return (
+    <div className="rounded-lg border border-border/60 bg-background/60 p-2.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{tierLabel} plan</span>
+        <span className="font-display text-xs">
+          <span className="text-foreground">{credits.toLocaleString()}</span>
+          <span className="text-muted-foreground"> / {monthlyGrant.toLocaleString()}</span>
+        </span>
+      </div>
+      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all`}
+          style={{ width: `${remainingPct}%` }}
+        />
+      </div>
+      <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+        <span>credits left {periodLabel}</span>
+        {tier === "free" && remainingPct < 50 && (
+          <Link to="/pricing" className="inline-flex items-center gap-0.5 font-semibold text-primary hover:underline">
+            Get 16× more <ArrowRight className="h-2.5 w-2.5" />
+          </Link>
+        )}
+        {tier === "pro" && (
+          <Link to="/pricing" className="inline-flex items-center gap-0.5 text-primary/80 hover:text-primary hover:underline">
+            Elite <Crown className="h-2.5 w-2.5" />
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PostSuccessNudge — subtle inline upsell shown ONCE per session after the
+// user has had at least 2 successful generations. Never blocks UI.
+// ─────────────────────────────────────────────────────────────────────────────
+const NUDGE_KEY = "razen.success.nudge.shown";
+
+export function PostSuccessNudge({ tier, trigger }: { tier: Tier; trigger: number }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    if (tier !== "free" || trigger < 2) return;
+    if (sessionStorage.getItem(NUDGE_KEY) === "1") return;
+    const t = setTimeout(() => setShow(true), 1500);
+    return () => clearTimeout(t);
+  }, [tier, trigger]);
+
+  if (!show) return null;
+  return (
+    <div className="pointer-events-auto fixed bottom-5 right-5 z-50 animate-in fade-in slide-in-from-bottom-3 duration-500">
+      <div className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-card px-4 py-3 shadow-card backdrop-blur-md">
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary to-orange-500 text-primary-foreground">
+          <TrendingUp className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1 pr-2">
+          <div className="text-sm font-semibold">Loving Razen?</div>
+          <p className="text-[11px] text-muted-foreground">Pro is 16× the credits + memory + full Build Studio.</p>
+        </div>
+        <Link to="/pricing">
+          <Button size="sm" className="h-8 gap-1 px-3 text-xs">
+            <Crown className="h-3 w-3" />See Pro
+          </Button>
+        </Link>
+        <button
+          onClick={() => { setShow(false); try { sessionStorage.setItem(NUDGE_KEY, "1"); } catch { /* ignore */ } }}
+          className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:bg-muted"
+        >
+          <X className="h-3 w-3" />
+        </button>
       </div>
     </div>
   );

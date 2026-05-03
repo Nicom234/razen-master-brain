@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { stripeEnv } from "@/lib/stripe";
 import { MemoryPanel } from "@/components/MemoryPanel";
-import { UpgradeBanner, OutOfCreditsModal } from "@/components/UpgradeBanner";
+import { UpgradeBanner, OutOfCreditsModal, CreditMeter, PostSuccessNudge } from "@/components/UpgradeBanner";
 import { WriteWorkspace } from "@/components/write/WriteWorkspace";
 import { PlanWorkspace } from "@/components/plan/PlanWorkspace";
 import { ResearchLab } from "@/components/research/ResearchLab";
@@ -103,7 +103,19 @@ function AppPage() {
   const [wsSessions, setWsSessions] = useState<WsSession[]>([]);
   const [wsActiveId, setWsActiveId] = useState<string | null>(null);
   const [outOfCreditsOpen, setOutOfCreditsOpen] = useState(false);
+  const [successCount, setSuccessCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Increment success counter whenever credits drop (i.e., a generation completed).
+  // This drives the PostSuccessNudge visibility — only triggers for free users
+  // after at least 2 successful generations in a session.
+  const prevCreditsRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (credits !== null && prevCreditsRef.current !== null && credits < prevCreditsRef.current) {
+      setSuccessCount((n) => n + 1);
+    }
+    prevCreditsRef.current = credits;
+  }, [credits]);
 
   // Show out-of-credits modal when free user hits 0 (only once per session).
   useEffect(() => {
@@ -500,15 +512,16 @@ function AppPage() {
 
         {/* Footer */}
         <div className="border-t border-border/60 p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-2.5">
             <div className="text-xs">
               <div className="font-medium truncate max-w-[120px]">{user?.email?.split("@")[0]}</div>
-              {credits !== null && <div className="text-muted-foreground">{credits.toLocaleString()} credits left</div>}
+              <div className="text-muted-foreground">{tier === "elite" ? "Elite member" : tier === "pro" ? "Pro member" : "Free plan"}</div>
             </div>
             {tier === "free" && (
               <Link to="/pricing"><Button size="sm" className="h-8 gap-1"><Sparkles className="h-3 w-3" />Upgrade</Button></Link>
             )}
           </div>
+          <CreditMeter tier={tier} credits={credits} monthlyGrant={monthlyGrant} />
           <Button size="sm" variant="ghost" className="mt-2 h-8 w-full justify-start text-muted-foreground" onClick={() => setMemOpen(true)}>
             <Brain className="mr-2 h-3.5 w-3.5" />Memory{tier !== "elite" && <span className="ml-auto text-[10px] uppercase tracking-wide text-primary">Elite</span>}
           </Button>
@@ -525,6 +538,7 @@ function AppPage() {
 
       {memOpen && user && <MemoryPanel userId={user.id} tier={tier} onClose={() => setMemOpen(false)} />}
       <OutOfCreditsModal open={outOfCreditsOpen} onClose={() => setOutOfCreditsOpen(false)} />
+      <PostSuccessNudge tier={tier} trigger={successCount} />
 
       {/* Main */}
       <div className="flex flex-1 flex-col">

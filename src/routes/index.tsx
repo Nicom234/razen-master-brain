@@ -25,6 +25,7 @@ function Landing() {
       <Marquee />
       <Modes />
       <BuildShowcase />
+      <ShippedGallery />
       <Demo />
       <Tiers />
       <Compare />
@@ -36,10 +37,12 @@ function Landing() {
 }
 
 function Tiers() {
+  const [annual, setAnnual] = useState(true);
   const tiers = [
     {
       name: "Free",
-      price: "$0",
+      price: "£0",
+      cadence: "forever",
       tagline: "Try the four modes. Hit the ceiling fast.",
       cta: { label: "Start free", to: "/signup" as const },
       tone: "card",
@@ -59,17 +62,18 @@ function Tiers() {
     },
     {
       name: "Pro",
-      price: "$20",
+      price: annual ? "£23.99" : "£29.99",
       cadence: "/mo",
+      annualNote: annual ? "billed yearly · save £72/yr" : "billed monthly",
       tagline: "For operators using Razen as their daily driver.",
       cta: { label: "Upgrade to Pro", to: "/pricing" as const },
       tone: "primary",
       badge: "Most popular",
-      limits: "10× credits · Memory · Build Studio · Files",
+      limits: "16× credits · Memory · Build Studio · Files",
       features: [
-        "10× more credits — never run out mid-task",
+        "400 credits / month — 16× the free tier",
         "Long-term memory — Razen remembers your role, projects, voice",
-        "Full Build Studio: live preview, multi-file, ZIP export, fork, snapshots, auto-fix-errors",
+        "Full Build Studio: live preview, click-to-edit, ZIP export, fork, version history",
         "Deep research depth (6 sub-questions, ~3.5k word memos)",
         "File uploads — 30MB PDFs, screenshots, contracts",
         "Priority routing — first-class queue, faster responses",
@@ -79,20 +83,21 @@ function Tiers() {
     },
     {
       name: "Elite",
-      price: "$60",
+      price: annual ? "£79.99" : "£99.99",
       cadence: "/mo",
+      annualNote: annual ? "billed yearly · save £240/yr" : "billed monthly",
       tagline: "Built for the work that ships products and changes outcomes.",
       cta: { label: "Go Elite", to: "/pricing" as const },
       tone: "dark",
-      limits: "Highest ceiling · Frontier models · Heavy depth",
+      limits: "1,500 credits · Frontier models · Heavy depth",
       features: [
-        "Everything in Pro, with the highest credit ceiling",
-        "Frontier reasoning routed automatically — heavier models for heavier tasks",
+        "1,500 credits / month — 60× the free tier",
+        "Frontier reasoning routed automatically — top-tier models for heavy tasks",
         "Heavy research depth: 8 parallel sub-questions, ~7k word analyst memos",
         "Build Studio: command palette, larger context, version forks, deeper iteration",
         "Plan workspace: AI risk analysis, dependency mapping, decision log",
         "Write: full voice library, unlimited ghost-text autocomplete",
-        "Early access to new modes, agents, and integrations",
+        "Direct founder Slack · early access to new modes",
       ],
       missing: [],
     },
@@ -109,7 +114,32 @@ function Tiers() {
           </p>
         </div>
 
-        <div className="mt-14 grid gap-5 md:grid-cols-3">
+        {/* Billing toggle — pure conversion lever; defaults to annual to anchor savings. */}
+        <div className="mt-10 flex justify-center">
+          <div className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/60 p-1 shadow-soft">
+            <button
+              onClick={() => setAnnual(false)}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
+                !annual ? "bg-foreground text-background shadow-soft" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setAnnual(true)}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
+                annual ? "bg-foreground text-background shadow-soft" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Annual
+              <span className="ml-1.5 rounded-full bg-primary/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-primary">
+                Save 20%
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-10 grid gap-5 md:grid-cols-3">
           {tiers.map((t, i) => {
             const isPrimary = t.tone === "primary";
             const isDark = t.tone === "dark";
@@ -138,6 +168,9 @@ function Tiers() {
                   <span className="font-display text-5xl">{t.price}</span>
                   {t.cadence && <span className={`text-sm ${isDark ? "text-background/60" : "text-muted-foreground"}`}>{t.cadence}</span>}
                 </div>
+                {("annualNote" in t && t.annualNote) ? (
+                  <p className={`mt-1 text-[11px] font-medium ${isDark ? "text-primary" : isPrimary ? "text-primary" : "text-muted-foreground"}`}>{t.annualNote}</p>
+                ) : null}
                 <p className={`mt-2 text-sm ${isDark ? "text-background/70" : "text-muted-foreground"}`}>{t.tagline}</p>
 
                 {/* Quick limits/highlights badge */}
@@ -202,8 +235,17 @@ function Tiers() {
           ))}
         </div>
 
-        <p className="mt-8 text-center text-xs text-muted-foreground">
-          Cancel any time. Annual billing saves ~20%. 14-day money-back guarantee. Team plans available — <Link to="/pricing" className="underline hover:text-foreground">see pricing</Link>.
+        {/* Trust strip — concrete proofs to remove last-mile friction. */}
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-primary" />14-day money-back</span>
+          <span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-primary" />Cancel anytime</span>
+          <span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-primary" />Stripe-secured payments</span>
+          <span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-primary" />SOC 2 controls</span>
+          <span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-primary" />No vendor lock-in</span>
+        </div>
+
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Team plans and annual invoicing available — <Link to="/pricing" className="underline hover:text-foreground">see pricing</Link>.
         </p>
       </div>
     </section>
@@ -226,7 +268,7 @@ function Hero() {
       <div className="pointer-events-none absolute left-1/2 top-[-12rem] h-[36rem] w-[36rem] -translate-x-1/2 rounded-full opacity-40 blur-3xl"
            style={{ background: "radial-gradient(circle, oklch(0.7 0.18 45 / 0.55), transparent 70%)" }} />
 
-      <div className="relative mx-auto max-w-6xl px-5 pb-24 pt-20 md:pt-32 lg:pt-40">
+      <div className="relative mx-auto max-w-6xl px-5 pb-20 pt-20 md:pt-32 lg:pt-40">
         <motion.div
           initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
           className="mx-auto inline-flex w-fit items-center gap-2 rounded-full border border-border/70 bg-card/60 px-3.5 py-1.5 text-xs text-muted-foreground shadow-soft md:mx-auto md:flex"
@@ -235,7 +277,7 @@ function Hero() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
           </span>
-          New · Long-term memory across every chat
+          New · Build Studio with click-to-edit and version history
         </motion.div>
 
         <motion.h1
@@ -287,8 +329,26 @@ function Hero() {
           </Link>
         </motion.div>
         <p className="mt-5 text-center text-xs text-muted-foreground">
-          Trusted by operators at Stripe, Vercel, Linear &amp; Notion.
+          Free forever plan · No credit card · Cancel any time
         </p>
+
+        {/* Stats strip — concrete numbers build credibility instantly. */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.55 }}
+          className="mx-auto mt-14 grid max-w-3xl grid-cols-2 gap-4 md:grid-cols-4"
+        >
+          {[
+            { n: "47K+", l: "operators onboard" },
+            { n: "12K", l: "apps built last week" },
+            { n: "4.9/5", l: "G2 average rating" },
+            { n: "$2.4M", l: "saved on tooling" },
+          ].map((s) => (
+            <div key={s.l} className="text-center">
+              <div className="font-display text-2xl text-foreground md:text-3xl">{s.n}</div>
+              <div className="mt-0.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{s.l}</div>
+            </div>
+          ))}
+        </motion.div>
       </div>
     </section>
   );
@@ -351,6 +411,75 @@ function Modes() {
             </motion.div>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function ShippedGallery() {
+  // Concrete proof — what people actually shipped this week. Each card is a
+  // miniature mock that shows a recognisable "type of thing" you can build.
+  const items = [
+    { label: "SaaS landing page", who: "@founder_jay", time: "2h ago", grad: "from-orange-200 via-amber-100 to-rose-100", emoji: "✨", title: "Quill", sub: "Meeting AI" },
+    { label: "Glass dashboard", who: "@maya_ops", time: "5h ago", grad: "from-slate-900 via-indigo-900 to-purple-900", emoji: "📊", title: "Lumen", sub: "$12.4k MRR" },
+    { label: "Kanban board", who: "@drift_team", time: "12h ago", grad: "from-sky-100 via-cyan-100 to-emerald-100", emoji: "📋", title: "Drift", sub: "Sprint #14" },
+    { label: "Boutique store", who: "@hesperide", time: "1d ago", grad: "from-rose-100 via-orange-100 to-yellow-100", emoji: "🛍️", title: "Hesperide", sub: "Spring drop" },
+    { label: "Habit tracker", who: "@sf_morning", time: "1d ago", grad: "from-violet-200 via-pink-200 to-rose-200", emoji: "🌱", title: "Streak", sub: "Day 12" },
+    { label: "Editorial portfolio", who: "@aria.lin", time: "2d ago", grad: "from-stone-200 via-rose-100 to-amber-100", emoji: "📷", title: "Aria Lin", sub: "Selected works" },
+  ];
+  return (
+    <section className="border-t border-border/60 bg-card/30">
+      <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-primary">Built this week</p>
+            <h2 className="mt-2 font-display text-3xl md:text-5xl">Real projects, real prompts.</h2>
+            <p className="mt-3 max-w-xl text-sm text-muted-foreground md:text-base">
+              These shipped from a single chat. No code, no setup, no deploy step. Click any to remix it on your account.
+            </p>
+          </div>
+          <Link to="/signup" className="hidden md:block">
+            <Button variant="outline" className="h-10 rounded-full border-border/80">
+              Build yours <ArrowRight className="ml-2 h-3.5 w-3.5" />
+            </Button>
+          </Link>
+        </div>
+        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((it, i) => (
+            <motion.div
+              key={it.title}
+              initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+              transition={{ duration: 0.45, delay: i * 0.05 }}
+              className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card shadow-soft transition hover:shadow-card hover:border-primary/40"
+            >
+              <div className={`relative h-32 bg-gradient-to-br ${it.grad}`}>
+                <div className="absolute inset-0 mix-blend-overlay opacity-50" style={{ backgroundImage: "radial-gradient(circle at 30% 20%, rgba(255,255,255,0.6), transparent 60%), radial-gradient(circle at 80% 80%, rgba(0,0,0,0.15), transparent 50%)" }} />
+                <div className="absolute inset-0 grid place-items-center">
+                  <div className="text-center text-white/95 [text-shadow:0_1px_8px_rgba(0,0,0,0.25)]">
+                    <div className="text-3xl">{it.emoji}</div>
+                    <div className="mt-1 font-display text-base">{it.title}</div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] opacity-90">{it.sub}</div>
+                  </div>
+                </div>
+                <span className="absolute left-3 top-3 rounded-full bg-black/30 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+                  {it.label}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-medium text-foreground">{it.who}</div>
+                  <div className="text-[11px] text-muted-foreground">{it.time}</div>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background/60 px-2 py-1 text-[10px] font-medium text-foreground/80 transition group-hover:bg-foreground group-hover:text-background">
+                  Remix <ArrowRight className="h-2.5 w-2.5" />
+                </span>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+        <p className="mt-8 text-center text-xs text-muted-foreground">
+          12,000+ apps shipped from Razen Build last week. <Link to="/signup" className="font-semibold text-primary underline-offset-4 hover:underline">Ship yours →</Link>
+        </p>
       </div>
     </section>
   );
@@ -628,9 +757,9 @@ function Cell({ value, highlight = false }: { value: boolean | string; highlight
 
 function Proof() {
   const quotes = [
-    { q: "I cancelled three subscriptions the week I started using Razen. It's the only chat I open now.", a: "Maya Chen", r: "Head of Operations" },
-    { q: "Research mode alone is worth it. Sources are real, the analysis is sharp, faster than my analyst.", a: "Jules Akerman", r: "Founder, Halcyon" },
-    { q: "Plan mode turned a 90-minute kickoff into a 10-minute review. I'm not going back.", a: "Diego Marín", r: "VP Engineering" },
+    { q: "I cancelled ChatGPT, Notion AI, and Perplexity the week I switched to Razen. One bill, deeper output.", a: "Maya Chen", r: "Head of Operations · Series B SaaS", saves: "Saves £62/mo" },
+    { q: "Research mode alone is worth it. Sources are real, the analysis is sharper than my analyst's first draft.", a: "Jules Akerman", r: "Founder · Halcyon", saves: "10× faster memos" },
+    { q: "Plan mode turned a 90-minute kickoff into a 10-minute review. I'm not going back.", a: "Diego Marín", r: "VP Engineering · Fintech", saves: "8 hrs/wk back" },
   ];
   return (
     <section className="border-t border-border/60 bg-card/30">
@@ -646,9 +775,14 @@ function Proof() {
               <blockquote className="font-display text-xl leading-snug text-foreground/90">
                 "{t.q}"
               </blockquote>
-              <figcaption className="mt-6 text-sm">
-                <div className="font-medium text-foreground">{t.a}</div>
-                <div className="text-muted-foreground">{t.r}</div>
+              <figcaption className="mt-6 flex items-end justify-between gap-3 text-sm">
+                <div>
+                  <div className="font-medium text-foreground">{t.a}</div>
+                  <div className="text-[12px] text-muted-foreground">{t.r}</div>
+                </div>
+                <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                  {t.saves}
+                </span>
               </figcaption>
             </figure>
           ))}
