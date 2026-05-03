@@ -13,9 +13,7 @@ interface UpgradeBannerProps {
   monthlyGrant: number;
 }
 
-// Persistent, intelligently-triggered upgrade banner.
-// Shown at the top of the app for free users — context shifts based on credit state.
-// Dismissible per-session; reappears on hard refresh or when credits run low.
+// Persistent, intelligently-triggered upgrade banner for free users.
 export function UpgradeBanner({ tier, credits, monthlyGrant }: UpgradeBannerProps) {
   const [dismissed, setDismissed] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -46,7 +44,7 @@ export function UpgradeBanner({ tier, credits, monthlyGrant }: UpgradeBannerProp
           <Zap className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
           <p className="flex-1 truncate">
             <span className="font-semibold">You're out of credits.</span>{" "}
-            <span className="text-muted-foreground">Pro gives you 16× more — never run out mid-task.</span>
+            <span className="text-muted-foreground">Pro · 400 credits/month — never run out mid-task.</span>
           </p>
           <Link to="/pricing">
             <Button size="sm" className="h-8 gap-1.5">
@@ -90,7 +88,7 @@ export function UpgradeBanner({ tier, credits, monthlyGrant }: UpgradeBannerProp
       <div className="mx-auto flex max-w-6xl items-center gap-3 text-sm">
         <Crown className="h-4 w-4 shrink-0 text-primary" />
         <p className="flex-1 truncate text-muted-foreground">
-          On <span className="font-medium text-foreground">Free</span> · Pro unlocks deep research, the Build Studio, memory, and 16× more credits.
+          On <span className="font-medium text-foreground">Free</span> · Pro unlocks deep research, the Build Studio, memory, and 400 credits/month.
         </p>
         <Link to="/pricing">
           <Button size="sm" variant="ghost" className="h-7 gap-1 px-2.5 text-xs hover:bg-primary/10 hover:text-primary">
@@ -130,7 +128,7 @@ export function OutOfCreditsModal({ open, onClose }: OutOfCreditsModalProps) {
           </div>
           <h3 className="mt-5 font-display text-2xl">You hit the free ceiling.</h3>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            That's a sign you're getting real value. Pro gives you <strong>10× more credits</strong>,
+            That's a sign you're getting real value. Pro gives you <strong>400 credits / month</strong>,
             memory across every chat, and the full Build studio. Cancel any time.
           </p>
 
@@ -149,7 +147,7 @@ export function OutOfCreditsModal({ open, onClose }: OutOfCreditsModalProps) {
 
           <div className="mt-6 grid gap-2.5 text-left">
             {[
-              { i: Brain, t: "10× more credits", d: "Pro gives you a generous monthly pool — never run out mid-task." },
+              { i: Brain, t: "400 credits / month", d: "A generous monthly pool — never run out mid-task." },
               { i: Rocket, t: "Build Studio + Memory", d: "Live preview, file tree, ZIP export. And memory across every chat." },
               { i: Crown, t: "Frontier reasoning (Elite)", d: "Deeper research, longer context, the highest ceiling." },
             ].map((b) => (
@@ -164,7 +162,7 @@ export function OutOfCreditsModal({ open, onClose }: OutOfCreditsModalProps) {
           </div>
 
           <p className="mt-5 text-[11px] text-muted-foreground">
-            Free credits refill on schedule. Or upgrade for unlimited capacity.
+            Free credits refill daily. Or upgrade for monthly capacity.
           </p>
         </div>
       </div>
@@ -220,9 +218,6 @@ export function LockedFeature({ required, feature, description, compact }: Locke
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CreditMeter — sidebar credit progress bar with tier-aware copy.
-// Free: red/amber bar with "Get 16× more" CTA when usage > 50%.
-// Pro:  primary-orange bar + subtle Elite nudge.
-// Elite: violet/fuchsia bar — pure prestige.
 // ─────────────────────────────────────────────────────────────────────────────
 interface CreditMeterProps {
   tier: Tier;
@@ -269,7 +264,7 @@ export function CreditMeter({ tier, credits, monthlyGrant }: CreditMeterProps) {
         <span>credits left {periodLabel}</span>
         {tier === "free" && remainingPct < 50 && (
           <Link to="/pricing" className="inline-flex items-center gap-0.5 font-semibold text-primary hover:underline">
-            Get 16× more <ArrowRight className="h-2.5 w-2.5" />
+            Get 400/mo <ArrowRight className="h-2.5 w-2.5" />
           </Link>
         )}
         {tier === "pro" && (
@@ -306,7 +301,7 @@ export function PostSuccessNudge({ tier, trigger }: { tier: Tier; trigger: numbe
         </div>
         <div className="min-w-0 flex-1 pr-2">
           <div className="text-sm font-semibold">Loving Razen?</div>
-          <p className="text-[11px] text-muted-foreground">Pro is 16× the credits + memory + full Build Studio.</p>
+          <p className="text-[11px] text-muted-foreground">Pro: 400 credits/mo, memory, full Build Studio.</p>
         </div>
         <Link to="/pricing">
           <Button size="sm" className="h-8 gap-1 px-3 text-xs">

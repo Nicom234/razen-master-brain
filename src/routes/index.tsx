@@ -69,9 +69,9 @@ function Tiers() {
       cta: { label: "Upgrade to Pro", to: "/pricing" as const },
       tone: "primary",
       badge: "Most popular",
-      limits: "16× credits · Memory · Build Studio · Files",
+      limits: "400 credits/mo · Memory · Build Studio · Files",
       features: [
-        "400 credits / month — 16× the free tier",
+        "400 credits / month — generous monthly pool, no daily reset",
         "Long-term memory — Razen remembers your role, projects, voice",
         "Full Build Studio: live preview, click-to-edit, ZIP export, fork, version history",
         "Deep research depth (6 sub-questions, ~3.5k word memos)",
@@ -89,9 +89,9 @@ function Tiers() {
       tagline: "Built for the work that ships products and changes outcomes.",
       cta: { label: "Go Elite", to: "/pricing" as const },
       tone: "dark",
-      limits: "1,500 credits · Frontier models · Heavy depth",
+      limits: "1,500 credits/mo · Frontier models · Heavy depth",
       features: [
-        "1,500 credits / month — 60× the free tier",
+        "1,500 credits / month — capacity for sustained heavy work",
         "Frontier reasoning routed automatically — top-tier models for heavy tasks",
         "Heavy research depth: 8 parallel sub-questions, ~7k word analyst memos",
         "Build Studio: command palette, larger context, version forks, deeper iteration",
@@ -225,7 +225,7 @@ function Tiers() {
           {[
             { who: "Founders & operators", w: "Pro", reason: "Ship products faster — Build Studio + memory + deep research." },
             { who: "Analysts & researchers", w: "Elite", reason: "8-source parallel research, ~7k word memos with citations and contrarian analysis." },
-            { who: "Marketing & content", w: "Pro", reason: "Voice library, ghost-text autocomplete, version history. Notion AI replaced." },
+            { who: "Marketing & content", w: "Pro", reason: "Voice library, ghost-text autocomplete, version history — built to replace Notion AI." },
           ].map((c) => (
             <div key={c.who} className="rounded-xl border border-border/70 bg-card/50 p-4 text-sm">
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{c.who}</div>
@@ -237,11 +237,10 @@ function Tiers() {
 
         {/* Trust strip — concrete proofs to remove last-mile friction. */}
         <div className="mt-10 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-primary" />14-day money-back</span>
           <span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-primary" />Cancel anytime</span>
           <span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-primary" />Stripe-secured payments</span>
-          <span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-primary" />SOC 2 controls</span>
-          <span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-primary" />No vendor lock-in</span>
+          <span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-primary" />Your data isn't used to train models</span>
+          <span className="inline-flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-primary" />Export your work as Markdown or ZIP</span>
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
@@ -331,41 +330,31 @@ function Hero() {
         <p className="mt-5 text-center text-xs text-muted-foreground">
           Free forever plan · No credit card · Cancel any time
         </p>
-
-        {/* Stats strip — concrete numbers build credibility instantly. */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.55 }}
-          className="mx-auto mt-14 grid max-w-3xl grid-cols-2 gap-4 md:grid-cols-4"
-        >
-          {[
-            { n: "47K+", l: "operators onboard" },
-            { n: "12K", l: "apps built last week" },
-            { n: "4.9/5", l: "G2 average rating" },
-            { n: "$2.4M", l: "saved on tooling" },
-          ].map((s) => (
-            <div key={s.l} className="text-center">
-              <div className="font-display text-2xl text-foreground md:text-3xl">{s.n}</div>
-              <div className="mt-0.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{s.l}</div>
-            </div>
-          ))}
-        </motion.div>
       </div>
     </section>
   );
 }
 
 function Marquee() {
-  const logos = ["STRIPE", "VERCEL", "LINEAR", "NOTION", "RAMP", "FIGMA", "SUPABASE", "RETOOL"];
+  // Honest comparative framing — what Razen replaces, not who endorses it.
+  const replaces = [
+    { name: "ChatGPT Plus", note: "Q&A + memory" },
+    { name: "Perplexity Pro", note: "research + citations" },
+    { name: "Notion AI", note: "writing + ghost-text" },
+    { name: "Lovable / v0", note: "Build studio" },
+    { name: "Linear AI", note: "planning + Kanban" },
+  ];
   return (
     <section className="border-y border-border/60 bg-card/30">
       <div className="mx-auto max-w-6xl px-5 py-10">
         <p className="text-center text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
-          The team behind your favourite tools, in one tab
+          Replaces a stack of subscriptions — one bill, one chat
         </p>
-        <div className="mt-6 grid grid-cols-4 items-center gap-x-8 gap-y-5 md:grid-cols-8">
-          {logos.map((l) => (
-            <div key={l} className="text-center font-display text-base tracking-[0.18em] text-foreground/40 transition hover:text-foreground/70">
-              {l}
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-7 gap-y-3">
+          {replaces.map((r) => (
+            <div key={r.name} className="inline-flex items-baseline gap-1.5">
+              <span className="font-display text-sm tracking-[0.05em] text-foreground/70">{r.name}</span>
+              <span className="text-[10px] text-muted-foreground">· {r.note}</span>
             </div>
           ))}
         </div>
@@ -417,30 +406,30 @@ function Modes() {
 }
 
 function ShippedGallery() {
-  // Concrete proof — what people actually shipped this week. Each card is a
-  // miniature mock that shows a recognisable "type of thing" you can build.
+  // Illustrative archetypes — what Razen Build can produce from a single prompt.
+  // No fake users, no fake timestamps. Each card is labelled as an example.
   const items = [
-    { label: "SaaS landing page", who: "@founder_jay", time: "2h ago", grad: "from-orange-200 via-amber-100 to-rose-100", emoji: "✨", title: "Quill", sub: "Meeting AI" },
-    { label: "Glass dashboard", who: "@maya_ops", time: "5h ago", grad: "from-slate-900 via-indigo-900 to-purple-900", emoji: "📊", title: "Lumen", sub: "$12.4k MRR" },
-    { label: "Kanban board", who: "@drift_team", time: "12h ago", grad: "from-sky-100 via-cyan-100 to-emerald-100", emoji: "📋", title: "Drift", sub: "Sprint #14" },
-    { label: "Boutique store", who: "@hesperide", time: "1d ago", grad: "from-rose-100 via-orange-100 to-yellow-100", emoji: "🛍️", title: "Hesperide", sub: "Spring drop" },
-    { label: "Habit tracker", who: "@sf_morning", time: "1d ago", grad: "from-violet-200 via-pink-200 to-rose-200", emoji: "🌱", title: "Streak", sub: "Day 12" },
-    { label: "Editorial portfolio", who: "@aria.lin", time: "2d ago", grad: "from-stone-200 via-rose-100 to-amber-100", emoji: "📷", title: "Aria Lin", sub: "Selected works" },
+    { label: "SaaS landing page", grad: "from-orange-200 via-amber-100 to-rose-100", emoji: "✨", title: "Quill", sub: "Meeting AI", prompt: "Landing page for an AI meeting assistant" },
+    { label: "Glass dashboard", grad: "from-slate-900 via-indigo-900 to-purple-900", emoji: "📊", title: "Lumen", sub: "Revenue dashboard", prompt: "Glassy SaaS revenue dashboard" },
+    { label: "Kanban board", grad: "from-sky-100 via-cyan-100 to-emerald-100", emoji: "📋", title: "Drift", sub: "Sprint board", prompt: "Linear-style Kanban for engineering sprints" },
+    { label: "Boutique store", grad: "from-rose-100 via-orange-100 to-yellow-100", emoji: "🛍️", title: "Hesperide", sub: "Spring collection", prompt: "Boutique skincare e-commerce" },
+    { label: "Habit tracker", grad: "from-violet-200 via-pink-200 to-rose-200", emoji: "🌱", title: "Streak", sub: "Daily habits", prompt: "Minimal habit tracker with streaks" },
+    { label: "Editorial portfolio", grad: "from-stone-200 via-rose-100 to-amber-100", emoji: "📷", title: "Aria Lin", sub: "Selected works", prompt: "Editorial portfolio for a photographer" },
   ];
   return (
     <section className="border-t border-border/60 bg-card/30">
       <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-primary">Built this week</p>
-            <h2 className="mt-2 font-display text-3xl md:text-5xl">Real projects, real prompts.</h2>
+            <p className="text-sm font-medium text-primary">What you can build</p>
+            <h2 className="mt-2 font-display text-3xl md:text-5xl">From one prompt to a working app.</h2>
             <p className="mt-3 max-w-xl text-sm text-muted-foreground md:text-base">
-              These shipped from a single chat. No code, no setup, no deploy step. Click any to remix it on your account.
+              Examples of the kinds of projects Razen Build produces from a single description. No code, no setup, no deploy step.
             </p>
           </div>
           <Link to="/signup" className="hidden md:block">
             <Button variant="outline" className="h-10 rounded-full border-border/80">
-              Build yours <ArrowRight className="ml-2 h-3.5 w-3.5" />
+              Try it free <ArrowRight className="ml-2 h-3.5 w-3.5" />
             </Button>
           </Link>
         </div>
@@ -464,21 +453,24 @@ function ShippedGallery() {
                 <span className="absolute left-3 top-3 rounded-full bg-black/30 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
                   {it.label}
                 </span>
+                <span className="absolute right-3 top-3 rounded-full bg-white/85 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-foreground/70 backdrop-blur-sm">
+                  Example
+                </span>
               </div>
               <div className="flex items-center justify-between gap-3 p-4">
                 <div className="min-w-0">
-                  <div className="truncate text-xs font-medium text-foreground">{it.who}</div>
-                  <div className="text-[11px] text-muted-foreground">{it.time}</div>
+                  <div className="truncate text-[11px] text-muted-foreground">Prompt</div>
+                  <div className="truncate text-xs font-medium text-foreground">{it.prompt}</div>
                 </div>
                 <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background/60 px-2 py-1 text-[10px] font-medium text-foreground/80 transition group-hover:bg-foreground group-hover:text-background">
-                  Remix <ArrowRight className="h-2.5 w-2.5" />
+                  Try <ArrowRight className="h-2.5 w-2.5" />
                 </span>
               </div>
             </motion.div>
           ))}
         </div>
         <p className="mt-8 text-center text-xs text-muted-foreground">
-          12,000+ apps shipped from Razen Build last week. <Link to="/signup" className="font-semibold text-primary underline-offset-4 hover:underline">Ship yours →</Link>
+          Examples of Razen Build outputs. <Link to="/signup" className="font-semibold text-primary underline-offset-4 hover:underline">Build yours →</Link>
         </p>
       </div>
     </section>
@@ -676,23 +668,23 @@ function Demo() {
               </div>
               <span className="ml-3 text-xs text-muted-foreground">razen — research mode</span>
             </div>
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">Live web · grounded</span>
+            <span className="rounded-full border border-border/60 bg-background/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Example</span>
           </div>
           <div className="space-y-4 p-7 text-sm leading-relaxed">
             <div className="rounded-xl bg-muted px-4 py-3 text-foreground/90">
-              Compare the funding history of the top 3 AI agent startups in 2025.
+              Summarise the latest open-source AI release notes from this week.
             </div>
             <div className="space-y-2 text-muted-foreground">
-              <p>↳ Searching 18 sources… cross-referencing Crunchbase and recent press…</p>
+              <p>↳ Searching across release pages and dev blogs… grouping by project…</p>
             </div>
             <div className="space-y-3">
-              <p className="font-medium text-foreground">Here's what I found:</p>
+              <p className="font-medium text-foreground">Findings:</p>
               <ul className="space-y-2 text-foreground/85">
-                <li><span className="font-medium">Cognition AI</span> — $4B valuation, Series C led by Founders Fund <span className="citation-pill">[1]</span></li>
-                <li><span className="font-medium">Adept</span> — Acqui-hired by Amazon, ~$350M deal value <span className="citation-pill">[2]</span></li>
-                <li><span className="font-medium">Sierra</span> — $4.5B valuation, $175M Series B <span className="citation-pill">[3]</span></li>
+                <li>New mid-tier open model with ~32k context, MIT-licensed <span className="citation-pill">[1]</span></li>
+                <li>Major framework adds streaming tool-use and structured outputs <span className="citation-pill">[2]</span></li>
+                <li>Inference engine ships 2× throughput on consumer GPUs <span className="citation-pill">[3]</span></li>
               </ul>
-              <p className="text-xs text-muted-foreground italic">12 sources cited · 2 credits used</p>
+              <p className="text-xs text-muted-foreground italic">Illustrative example · sources cited inline · 2 credits</p>
             </div>
           </div>
         </motion.div>
@@ -756,35 +748,46 @@ function Cell({ value, highlight = false }: { value: boolean | string; highlight
 }
 
 function Proof() {
-  const quotes = [
-    { q: "I cancelled ChatGPT, Notion AI, and Perplexity the week I switched to Razen. One bill, deeper output.", a: "Maya Chen", r: "Head of Operations · Series B SaaS", saves: "Saves £62/mo" },
-    { q: "Research mode alone is worth it. Sources are real, the analysis is sharper than my analyst's first draft.", a: "Jules Akerman", r: "Founder · Halcyon", saves: "10× faster memos" },
-    { q: "Plan mode turned a 90-minute kickoff into a 10-minute review. I'm not going back.", a: "Diego Marín", r: "VP Engineering · Fintech", saves: "8 hrs/wk back" },
+  // Honest value-prop strip — concrete capability claims, no fabricated testimonials.
+  const points = [
+    {
+      title: "One bill instead of four",
+      body: "Pro at £29.99/mo lands below ChatGPT Plus + Notion AI + Perplexity Pro combined. One subscription, four specialist modes.",
+    },
+    {
+      title: "Cited research, no hallucinated URLs",
+      body: "Research mode runs live web search and links every claim back to a real source. You can click each citation and verify it.",
+    },
+    {
+      title: "From plan to working app in one chat",
+      body: "Sketch a plan in Plan mode, then describe the app in Build. Sandboxed live preview, exportable as a ZIP. Yours forever.",
+    },
   ];
   return (
     <section className="border-t border-border/60 bg-card/30">
       <div className="mx-auto max-w-6xl px-5 py-24 md:py-32">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-medium text-primary">Operators are switching</p>
-          <h2 className="mt-3 font-display text-4xl md:text-5xl">From bookmarks of tools to one chat.</h2>
+          <p className="text-sm font-medium text-primary">Why Razen</p>
+          <h2 className="mt-3 font-display text-4xl md:text-5xl">From a bookmark folder of tools to one chat.</h2>
+          <p className="mt-5 text-muted-foreground">
+            Specialist modes, real citations, and a Build studio that exports a downloadable project.
+            No tab juggling, no copy-paste between tools.
+          </p>
         </div>
         <div className="mt-14 grid gap-6 md:grid-cols-3">
-          {quotes.map((t) => (
-            <figure key={t.a} className="relative rounded-2xl border border-border/70 bg-background/70 p-7 shadow-soft">
-              <Quote className="absolute right-5 top-5 h-7 w-7 text-primary/15" />
-              <blockquote className="font-display text-xl leading-snug text-foreground/90">
-                "{t.q}"
-              </blockquote>
-              <figcaption className="mt-6 flex items-end justify-between gap-3 text-sm">
-                <div>
-                  <div className="font-medium text-foreground">{t.a}</div>
-                  <div className="text-[12px] text-muted-foreground">{t.r}</div>
-                </div>
-                <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                  {t.saves}
-                </span>
-              </figcaption>
-            </figure>
+          {points.map((p, i) => (
+            <motion.div
+              key={p.title}
+              initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: i * 0.06 }}
+              className="rounded-2xl border border-border/70 bg-background/70 p-7 shadow-soft"
+            >
+              <div className="grid h-9 w-9 place-items-center rounded-lg bg-foreground text-background">
+                <Quote className="h-4 w-4" />
+              </div>
+              <h3 className="mt-5 font-display text-lg leading-tight">{p.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{p.body}</p>
+            </motion.div>
           ))}
         </div>
       </div>
