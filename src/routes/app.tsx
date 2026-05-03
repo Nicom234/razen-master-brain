@@ -14,7 +14,7 @@ import { MemoryPanel } from "@/components/MemoryPanel";
 import { UpgradeBanner, OutOfCreditsModal, CreditMeter, PostSuccessNudge } from "@/components/UpgradeBanner";
 import { WriteWorkspace } from "@/components/write/WriteWorkspace";
 import { PlanWorkspace } from "@/components/plan/PlanWorkspace";
-import { ResearchLab } from "@/components/research/ResearchLab";
+import { RazenAssistant } from "@/components/chatbot/RazenAssistant";
 import { BuildWorkspaceSafe } from "@/components/build/BuildWorkspaceSafe";
 
 export const Route = createFileRoute("/app")({
@@ -33,20 +33,6 @@ type WsSession = { id: string; title: string; updatedAt: number; preview?: strin
 function readWsSessions(m: Mode): WsSession[] {
   if (typeof window === "undefined") return [];
   try {
-    if (m === "research") {
-      const raw = localStorage.getItem("razen.research.lab.v1");
-      if (!raw) return [];
-      const store: Record<string, { id: string; query: string; updatedAt: number; plan?: { thesis?: string }; quickAnswer?: string }> = JSON.parse(raw);
-      return Object.values(store)
-        .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
-        .slice(0, 40)
-        .map((inv) => ({
-          id: inv.id,
-          title: inv.query ? inv.query.slice(0, 65) : "Investigation",
-          updatedAt: inv.updatedAt ?? 0,
-          preview: inv.plan?.thesis?.slice(0, 80) || inv.quickAnswer?.slice(0, 80) || "",
-        }));
-    }
     if (m === "write") {
       const raw = localStorage.getItem("razen.write.docs.v2");
       if (!raw) return [];
@@ -74,7 +60,7 @@ function readWsSessions(m: Mode): WsSession[] {
 }
 
 const MODES: { id: Mode; label: string; icon: typeof Search; hint: string }[] = [
-  { id: "research", label: "Research", icon: Search, hint: "Cited research with live web sources" },
+  { id: "research", label: "Chat", icon: Sparkles, hint: "Ask anything — research, writing, code, planning, life" },
   { id: "write", label: "Write", icon: PenTool, hint: "Editorial-grade drafting and polishing" },
   { id: "plan", label: "Plan", icon: ListChecks, hint: "Structured plans with owners and risks" },
   { id: "build", label: "Build", icon: Code2, hint: "Production-quality runnable code" },
@@ -106,9 +92,6 @@ function AppPage() {
   const [successCount, setSuccessCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Increment success counter whenever credits drop (i.e., a generation completed).
-  // This drives the PostSuccessNudge visibility — only triggers for free users
-  // after at least 2 successful generations in a session.
   const prevCreditsRef = useRef<number | null>(null);
   useEffect(() => {
     if (credits !== null && prevCreditsRef.current !== null && credits < prevCreditsRef.current) {
@@ -117,7 +100,6 @@ function AppPage() {
     prevCreditsRef.current = credits;
   }, [credits]);
 
-  // Show out-of-credits modal when free user hits 0 (only once per session).
   useEffect(() => {
     if (tier === "free" && credits !== null && credits <= 0) {
       const seen = sessionStorage.getItem("razen.ooc.seen");
@@ -129,7 +111,7 @@ function AppPage() {
   }, [tier, credits]);
 
   const refreshWsSessions = useCallback(() => {
-    if (mode !== "plan") {
+    if (mode !== "plan" && mode !== "research") {
       const sessions = readWsSessions(mode);
       setWsSessions(sessions);
       if (!wsActiveId && sessions.length > 0) setWsActiveId(sessions[0].id);
@@ -138,8 +120,6 @@ function AppPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const search = Route.useSearch() as { upgraded?: string };
 
-  // Estimated cost preview (mirrors edge `route()` heuristics).
-  // Build mode uses cheaper models via build-codegen and has its own scale.
   const estimatedCost = (() => {
     const heavy = input.length > 1100 || mode === "plan";
     const veryHeavy = input.length > 2400 || (mode === "build" && input.length > 1500);
@@ -196,7 +176,6 @@ function AppPage() {
   const loadConvs = async (uid: string) => {
     const { data: convData } = await supabase.from("conversations").select("id,title,updated_at").eq("user_id", uid).order("updated_at", { ascending: false }).limit(50);
     if (!convData) return;
-    // Fetch first user message for each conv as preview, in one query
     const ids = convData.map((c) => c.id);
     let previewMap = new Map<string, string>();
     if (ids.length) {
@@ -236,12 +215,14 @@ function AppPage() {
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages]);
 
-  // Refresh workspace sessions when mode changes.
   useEffect(() => {
-    if (mode !== "plan") {
+    if (mode !== "plan" && mode !== "research") {
       const sessions = readWsSessions(mode);
       setWsSessions(sessions);
       setWsActiveId(sessions[0]?.id ?? null);
+    } else {
+      setWsSessions([]);
+      setWsActiveId(null);
     }
   }, [mode]);
 
@@ -249,7 +230,6 @@ function AppPage() {
 
   const newWsSession = () => {
     setWsActiveId(null);
-    // Give workspace a moment to initialize then refresh
     setTimeout(refreshWsSessions, 400);
   };
 
@@ -323,7 +303,6 @@ function AppPage() {
       });
     };
 
-    // Ensure conversation exists
     let cid = convId;
     if (!cid) {
       const title = text.slice(0, 60) || "New chat";
@@ -340,7 +319,6 @@ function AppPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
 
-      // For multimodal messages with attachment, use OpenAI-style content array
       const apiMessages = next.map((m, i) => {
         if (i === next.length - 1 && att) {
           return {
@@ -407,7 +385,6 @@ function AppPage() {
         }
       }
 
-      // Persist assistant message (clean version, no source manifest)
       const cleaned = splitSources(acc).display;
       if (cid && cleaned) {
         await supabase.from("messages").insert({ conversation_id: cid, user_id: user.id, role: "assistant", content: acc });
@@ -428,13 +405,10 @@ function AppPage() {
     return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Redirecting…</div>;
   }
 
-  const ModeIcon = MODES.find((m) => m.id === mode)?.icon ?? Search;
-
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
       <aside className="hidden w-64 shrink-0 flex-col border-r border-border/60 bg-card/40 md:flex">
-        {/* Logo + mode context */}
         <div className="flex items-center justify-between px-4 pt-4 pb-3">
           <Link to="/" className="flex items-center gap-2">
             <div className="grid h-7 w-7 place-items-center rounded-md bg-foreground text-background font-display text-sm">R</div>
@@ -443,11 +417,10 @@ function AppPage() {
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary capitalize">{tier}</span>
         </div>
 
-        {/* New button — context-aware */}
         <div className="px-3 pb-3">
           {mode === "research" && (
-            <Button onClick={newWsSession} variant="outline" className="w-full justify-start gap-2 h-9">
-              <Plus className="h-4 w-4" />New investigation
+            <Button onClick={newChat} variant="outline" className="w-full justify-start gap-2 h-9">
+              <Plus className="h-4 w-4" />New chat
             </Button>
           )}
           {mode === "write" && (
@@ -467,12 +440,36 @@ function AppPage() {
           )}
         </div>
 
-        {/* History list — workspace sessions or Supabase convs */}
         <div className="flex-1 overflow-y-auto px-2 pb-2">
           <p className="px-2 pb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            {mode === "research" ? "Investigations" : mode === "write" ? "Documents" : mode === "build" ? "Builds" : mode === "plan" ? "Plans" : "Recent chats"}
+            {mode === "research" ? "Recent chats" : mode === "write" ? "Documents" : mode === "build" ? "Builds" : mode === "plan" ? "Plans" : "Recent chats"}
           </p>
-          {mode !== "plan" && wsSessions.length > 0 ? (
+          {mode === "research" ? (
+            convs.length > 0 ? (
+              convs.map((c) => (
+                <div key={c.id} className={`group relative mb-0.5 rounded-md ${convId === c.id ? "bg-muted" : ""}`}>
+                  <button
+                    onClick={() => openConv(c.id)}
+                    className="block w-full rounded-md px-2.5 py-2 pr-8 text-left hover:bg-muted/70"
+                  >
+                    <span className="truncate text-[13px] font-medium block">{c.title}</span>
+                    {c.preview && (
+                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">{c.preview}</p>
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteConv(c.id); }}
+                    className="absolute right-1.5 top-1.5 hidden rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive group-hover:block"
+                    title="Delete"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="px-2 text-xs text-muted-foreground">Nothing yet — say hi above.</p>
+            )
+          ) : mode !== "plan" && wsSessions.length > 0 ? (
             wsSessions.map((s) => (
               <div key={s.id} className={`group relative mb-0.5 rounded-md ${wsActiveId === s.id ? "bg-muted" : ""}`}>
                 <button
@@ -489,13 +486,11 @@ function AppPage() {
           ) : mode !== "plan" && wsSessions.length === 0 ? (
             <p className="px-2 text-xs text-muted-foreground">Nothing yet — start one above.</p>
           ) : null}
-          {/* Supabase convs shown when mode === "plan" (no workspace sessions) or as extra history */}
           {mode === "plan" && (
             <p className="px-2 py-2 text-xs text-muted-foreground italic">Plans are single-workspace — start a new plan or continue below.</p>
           )}
         </div>
 
-        {/* Divider + mode list */}
         <div className="border-t border-border/60 px-2 py-2">
           <p className="px-2 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Switch mode</p>
           {MODES.map((m) => {
@@ -510,7 +505,6 @@ function AppPage() {
           })}
         </div>
 
-        {/* Footer */}
         <div className="border-t border-border/60 p-3">
           <div className="flex items-center justify-between mb-2.5">
             <div className="text-xs">
@@ -545,7 +539,6 @@ function AppPage() {
         <UpgradeBanner tier={tier} credits={credits} monthlyGrant={monthlyGrant} />
         <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-md md:px-6">
           <div className="flex items-center gap-2">
-            {/* Mode picker */}
             <div className="flex items-center gap-1 rounded-full border border-border/70 bg-card p-1 shadow-soft">
               {MODES.map((m) => {
                 const Active = m.icon;
@@ -603,244 +596,16 @@ function AppPage() {
           />
         ) : mode === "plan" ? (
           <PlanWorkspace onCreditsChange={setCredits} onRefresh={refreshWsSessions} tier={tier} />
-        ) : mode === "research" ? (
-          <ResearchLab
+        ) : (
+          <RazenAssistant
+            tier={tier}
             onCreditsChange={setCredits}
             onExitResearch={() => setMode("write")}
-            tier={tier}
             selectedId={wsActiveId}
             onRefresh={refreshWsSessions}
           />
-        ) : (
-        <>
-        <div ref={scrollRef} className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-10">
-            {messages.length === 0 && !convId ? (
-              <div className="space-y-10">
-                {/* Greeting */}
-                <div>
-                  <h1 className="font-display text-4xl md:text-6xl tracking-tight">
-                    {greetingFor(new Date())}{user.email ? `, ${user.email.split("@")[0]}` : ""}.
-                  </h1>
-                  <p className="mt-3 text-lg text-muted-foreground">What are we shipping today?</p>
-                </div>
-
-                {/* Stats strip */}
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <StatCard label="Credits left" value={credits?.toLocaleString() ?? "—"} sub={`of ${monthlyGrant.toLocaleString()} ${tier === "free" ? "today" : "this month"}`} icon={Zap} />
-                  <StatCard label="Conversations" value={stats.chats.toLocaleString()} sub="lifetime" icon={MessageSquare} />
-                  <StatCard label="Memories" value={stats.memories.toLocaleString()} sub={tier === "elite" ? "active" : "Elite feature"} icon={Brain} />
-                </div>
-
-                {/* Mode launcher */}
-                <div>
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Launch a task</p>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    {MODES.map((m) => {
-                      const Active = m.icon;
-                      const selected = mode === m.id;
-                      return (
-                        <button
-                          key={m.id}
-                          onClick={() => setMode(m.id)}
-                          className={`group rounded-2xl border p-5 text-left transition ${selected ? "border-primary bg-primary/5 shadow-card" : "border-border/70 bg-card/60 hover:border-border hover:bg-card hover:shadow-soft"}`}
-                        >
-                          <div className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "bg-primary text-primary-foreground" : "bg-foreground text-background"}`}>
-                            <Active className="h-5 w-5" />
-                          </div>
-                          <div className="mt-4 font-display text-xl">{m.label}</div>
-                          <p className="mt-1 text-sm text-muted-foreground">{m.hint}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Suggested prompts */}
-                <div>
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Try a {MODES.find((m) => m.id === mode)?.label.toLowerCase()} prompt</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {modePrompts(mode).map((p) => (
-                      <button key={p} onClick={() => setInput(p)} className="rounded-xl border border-border/70 bg-card/60 p-4 text-left text-sm text-foreground/80 transition hover:bg-card hover:shadow-soft">
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Recent chats */}
-                {convs.length > 0 && (
-                  <div>
-                    <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Pick up where you left off</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {convs.slice(0, 6).map((c) => (
-                        <button key={c.id} onClick={() => openConv(c.id)} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-4 py-3 text-left text-sm transition hover:bg-card hover:shadow-soft">
-                          <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="flex-1 truncate">{c.title}</span>
-                          <span className="text-xs text-muted-foreground">{relTime(c.updated_at)}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {tier === "free" && (
-                  <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 to-transparent p-6">
-                    <div className="flex items-start gap-4">
-                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"><Sparkles className="h-5 w-5" /></div>
-                      <div className="flex-1">
-                        <div className="font-display text-xl">Unlock deeper reasoning & more builds</div>
-                        <p className="mt-1 text-sm text-muted-foreground">Pro adds file uploads and a larger monthly credit pool. Elite gives you higher-depth reasoning, more memory, and more room for serious research, planning, writing, and builds.</p>
-                      </div>
-                      <Link to="/pricing"><Button className="shrink-0">See plans</Button></Link>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {messages.map((m, i) => (
-                  <div key={i} className={m.role === "user" ? "flex justify-end" : ""}>
-                    <div className={m.role === "user"
-                      ? "max-w-[85%] rounded-2xl bg-foreground px-4 py-3 text-sm text-background"
-                      : "max-w-full"
-                    }>
-                      {m.role === "assistant" ? (
-                        <div className="space-y-3">
-                          <div className="prose-chat">
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              rehypePlugins={[rehypeHighlight]}
-                              components={{
-                                p: ({ children }) => <p>{renderCitations(children, m.sources)}</p>,
-                                li: ({ children }) => <li>{renderCitations(children, m.sources)}</li>,
-                              }}
-                            >{m.content || "…"}</ReactMarkdown>
-                          </div>
-                          {m.sources && m.sources.length > 0 && (
-                            <SourceStrip sources={m.sources} />
-                          )}
-                        </div>
-                      ) : <span className="whitespace-pre-wrap">{m.content}</span>}
-                    </div>
-                  </div>
-                ))}
-                {streaming && messages[messages.length - 1]?.role === "user" && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-                    Thinking…
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="sticky bottom-0 border-t border-border/60 bg-background/90 backdrop-blur-md">
-          <div className="mx-auto max-w-3xl px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">
-            {attachment && (
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1 text-xs">
-                <Paperclip className="h-3 w-3" />{attachment.name}
-                <button onClick={() => setAttachment(null)}><X className="h-3 w-3" /></button>
-              </div>
-            )}
-            <div className="rounded-2xl border border-border/70 bg-card shadow-soft transition focus-within:border-primary/40 focus-within:shadow-card">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                placeholder={`Ask Razen — ${mode} mode`}
-                rows={1}
-                className="min-h-[52px] resize-none border-0 bg-transparent px-4 py-3.5 text-base focus-visible:ring-0"
-              />
-              <div className="flex items-center justify-between gap-2 px-3 pb-2.5">
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => fileRef.current?.click()}
-                    className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                    title={tier === "free" ? "Upgrade to Pro for files" : "Attach file or image"}
-                  >
-                    <Paperclip className="h-4 w-4" />
-                  </button>
-                  <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={onFile} className="hidden" />
-                  <button
-                    onClick={() => setUseWebSearch((v) => !v)}
-                    className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition ${
-                      useWebSearch ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
-                    }`}
-                    title="Toggle live web search"
-                  >
-                    <Globe className="h-3.5 w-3.5" />Web
-                  </button>
-                </div>
-                <Button onClick={send} disabled={(!input.trim() && !attachment) || streaming} size="icon" className="h-9 w-9 rounded-full">
-                  <ArrowUp className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-xs text-muted-foreground">
-              {credits !== null && <span>{credits.toLocaleString()} credits left</span>}
-              <span className="hidden sm:inline opacity-50">·</span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary/60" />
-                This task: <strong className="text-foreground/80">{estimatedCost} {estimatedCost === 1 ? "credit" : "credits"}</strong>
-              </span>
-              {lastModel && (
-                <>
-                  <span className="hidden sm:inline opacity-50">·</span>
-                  <span>Last reply: {modelLabel(lastModel)}{lastCost ? ` (${lastCost})` : ""}</span>
-                </>
-              )}
-            </p>
-          </div>
-        </div>
-        </>
         )}
       </div>
-    </div>
-  );
-}
-
-function modePrompts(mode: Mode): string[] {
-  switch (mode) {
-    case "research": return ["Compare Cursor, Windsurf, and Zed for a TypeScript team.", "What are the latest funding rounds in AI agents this quarter?"];
-    case "write": return ["Draft a cold email to enterprise heads of operations.", "Rewrite this paragraph in the voice of The Economist."];
-    case "plan": return ["Plan a 30-day launch for a new SaaS pricing page.", "Break a website redesign into a 2-week sprint."];
-    case "build": return [
-      "Build an Apple-clean SaaS landing page for a meeting AI called Quill — hero, animated 'how it works', three-tier pricing with a working monthly/annual toggle, signup modal, FAQ accordion, dark mode toggle.",
-      "Build a dark glassmorphic fintech dashboard for Lumen Capital — sidebar nav, Cmd+K command palette, KPI cards with sparklines, a revenue chart with 7d/30d/90d toggle, a sortable filterable transactions table, and a donut allocation chart. Realistic seed data.",
-    ];
-  }
-}
-
-function greetingFor(d: Date) {
-  const h = d.getHours();
-  if (h < 5) return "Still up";
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
-}
-
-function relTime(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  const d = Math.floor(h / 24);
-  return `${d}d`;
-}
-
-function StatCard({ label, value, sub, icon: Icon }: { label: string; value: string; sub: string; icon: typeof Brain }) {
-  return (
-    <div className="rounded-2xl border border-border/70 bg-card/50 p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
-        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-      </div>
-      <div className="mt-2 font-display text-3xl">{value}</div>
-      <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>
     </div>
   );
 }
@@ -870,82 +635,4 @@ function splitSources(raw: string): { display: string; sources: Source[] } {
 
 function safeDomain(url: string) {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; }
-}
-
-function renderCitations(children: React.ReactNode, sources?: Source[]): React.ReactNode {
-  if (!sources || sources.length === 0) return children;
-  const map = new Map(sources.map((s) => [s.n, s]));
-  const transform = (node: React.ReactNode): React.ReactNode => {
-    if (typeof node === "string") {
-      const parts: React.ReactNode[] = [];
-      const regex = /\[(\d+)\]/g;
-      let lastIndex = 0;
-      let match: RegExpExecArray | null;
-      let key = 0;
-      while ((match = regex.exec(node)) !== null) {
-        if (match.index > lastIndex) parts.push(node.slice(lastIndex, match.index));
-        const n = Number(match[1]);
-        const src = map.get(n);
-        if (src) {
-          parts.push(
-            <a
-              key={`cite-${key++}`}
-              href={src.url}
-              target="_blank"
-              rel="noreferrer"
-              title={`${src.title} — ${src.domain}`}
-              className="ml-0.5 inline-flex items-center justify-center rounded-md bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary no-underline transition hover:bg-primary/20"
-            >
-              {n}
-            </a>,
-          );
-        } else {
-          parts.push(match[0]);
-        }
-        lastIndex = match.index + match[0].length;
-      }
-      if (lastIndex < node.length) parts.push(node.slice(lastIndex));
-      return parts.length ? parts : node;
-    }
-    if (Array.isArray(node)) return node.map((c, i) => <React.Fragment key={i}>{transform(c)}</React.Fragment>);
-    return node;
-  };
-  return transform(children);
-}
-
-function SourceStrip({ sources }: { sources: Source[] }) {
-  return (
-    <div className="rounded-xl border border-border/60 bg-card/60 p-3">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-        Sources · {sources.length}
-      </p>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {sources.map((s) => (
-          <a
-            key={s.n}
-            href={s.url}
-            target="_blank"
-            rel="noreferrer"
-            className="group flex items-start gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 transition hover:border-primary/40 hover:shadow-soft"
-          >
-            <img
-              src={`https://www.google.com/s2/favicons?domain=${s.domain}&sz=32`}
-              alt=""
-              className="mt-0.5 h-4 w-4 rounded-sm"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="grid h-4 w-4 shrink-0 place-items-center rounded bg-primary/10 text-[9px] font-semibold text-primary">{s.n}</span>
-                <span className="truncate text-[11px] text-muted-foreground">{s.domain}</span>
-              </div>
-              <p className="mt-0.5 line-clamp-2 text-[12px] font-medium text-foreground group-hover:text-primary">
-                {s.title}
-              </p>
-            </div>
-          </a>
-        ))}
-      </div>
-    </div>
-  );
 }
