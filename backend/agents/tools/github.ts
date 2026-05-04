@@ -1,19 +1,8 @@
-import type { Tool } from "./types.ts";
-import { getProviderToken, notConnectedResult } from "./_connections.ts";
+import type { Tool, ToolContext } from "./types.ts";
+import { nangoJSON, notConnected } from "./_nango.ts";
 
-async function ghFetch(path: string, token: string, method = "GET", body?: unknown) {
-  const res = await fetch(`https://api.github.com${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      "Content-Type": "application/json",
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  return res.json();
-}
+const P = "github";
+const GH_HDR = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
 
 const githubPrRead: Tool<{ owner: string; repo: string; pr_number?: number }, unknown> = {
   name: "github_pr_read",
@@ -21,33 +10,26 @@ const githubPrRead: Tool<{ owner: string; repo: string; pr_number?: number }, un
   parameters: {
     type: "object",
     properties: {
-      owner: { type: "string", description: "Repository owner (user or org)." },
-      repo: { type: "string", description: "Repository name." },
+      owner: { type: "string" },
+      repo: { type: "string" },
       pr_number: { type: "number", description: "Optional specific PR number." },
     },
     required: ["owner", "repo"],
   },
-  async execute({ owner, repo, pr_number }, ctx) {
-    const token = await getProviderToken(ctx, "github");
-    if (!token) return notConnectedResult("GitHub");
-    if (pr_number) {
-      const pr = await ghFetch(`/repos/${owner}/${repo}/pulls/${pr_number}`, token);
+  async execute({ owner, repo, pr_number }, ctx: ToolContext) {
+    try {
+      if (pr_number) {
+        const pr = await nangoJSON<Record<string, unknown>>(P, ctx.userId, `/repos/${owner}/${repo}/pulls/${pr_number}`, { extraHeaders: GH_HDR });
+        return { prs: [{ number: pr.number, title: pr.title, state: pr.state, body: pr.body, user: (pr.user as Record<string, unknown>)?.login, url: pr.html_url, draft: pr.draft }] };
+      }
+      const prs = await nangoJSON<unknown[]>(P, ctx.userId, `/repos/${owner}/${repo}/pulls?state=open&per_page=20`, { extraHeaders: GH_HDR });
       return {
-        prs: [{ number: pr.number, title: pr.title, state: pr.state, body: pr.body, user: pr.user?.login, url: pr.html_url, draft: pr.draft }],
+        prs: (Array.isArray(prs) ? prs : []).map((pr: Record<string, unknown>) => ({
+          number: pr.number, title: pr.title, state: pr.state, draft: pr.draft,
+          user: (pr.user as Record<string, unknown>)?.login, url: pr.html_url, created_at: pr.created_at,
+        })),
       };
-    }
-    const prs = await ghFetch(`/repos/${owner}/${repo}/pulls?state=open&per_page=20`, token);
-    return {
-      prs: (Array.isArray(prs) ? prs : []).map((pr: { number: number; title: string; state: string; draft: boolean; user?: { login: string }; html_url: string; created_at: string }) => ({
-        number: pr.number,
-        title: pr.title,
-        state: pr.state,
-        draft: pr.draft,
-        user: pr.user?.login,
-        url: pr.html_url,
-        created_at: pr.created_at,
-      })),
-    };
+    } catch { return notConnected("GitHub"); }
   },
 };
 
@@ -56,19 +38,16 @@ const githubPrComment: Tool<{ owner: string; repo: string; pr_number: number; bo
   description: "Post a comment on a GitHub PR. Use ONLY after user confirmation.",
   parameters: {
     type: "object",
-    properties: {
-      owner: { type: "string" },
-      repo: { type: "string" },
-      pr_number: { type: "number", description: "PR number." },
-      body: { type: "string", description: "Comment text (Markdown)." },
-    },
+    properties: { owner: { type: "string" }, repo: { type: "string" }, pr_number: { type: "number" }, body: { type: "string" } },
     required: ["owner", "repo", "pr_number", "body"],
   },
-  async execute({ owner, repo, pr_number, body }, ctx) {
-    const token = await getProviderToken(ctx, "github");
-    if (!token) return notConnectedResult("GitHub");
-    const data = await ghFetch(`/repos/${owner}/${repo}/issues/${pr_number}/comments`, token, "POST", { body });
-    return { comment_id: data.id, url: data.html_url };
+  async execute({ owner, repo, pr_number, body }, ctx: ToolContext) {
+    try {
+      const data = await nangoJSON<{ id: number; html_url: string }>(P, ctx.userId, `/repos/${owner}/${repo}/issues/${pr_number}/comments`, {
+        method: "POST", extraHeaders: GH_HDR, body: { body },
+      });
+      return { comment_id: data.id, url: data.html_url };
+    } catch { return notConnected("GitHub"); }
   },
 };
 
@@ -78,19 +57,19 @@ const githubIssueCreate: Tool<{ owner: string; repo: string; title: string; body
   parameters: {
     type: "object",
     properties: {
-      owner: { type: "string" },
-      repo: { type: "string" },
-      title: { type: "string", description: "Issue title." },
-      body: { type: "string", description: "Issue body (Markdown)." },
-      labels: { type: "array", items: { type: "string" }, description: "Optional labels." },
+      owner: { type: "string" }, repo: { type: "string" },
+      title: { type: "string" }, body: { type: "string" },
+      labels: { type: "array", items: { type: "string" } },
     },
     required: ["owner", "repo", "title"],
   },
-  async execute({ owner, repo, title, body, labels }, ctx) {
-    const token = await getProviderToken(ctx, "github");
-    if (!token) return notConnectedResult("GitHub");
-    const data = await ghFetch(`/repos/${owner}/${repo}/issues`, token, "POST", { title, body, labels });
-    return { issue_number: data.number, url: data.html_url };
+  async execute({ owner, repo, title, body, labels }, ctx: ToolContext) {
+    try {
+      const data = await nangoJSON<{ number: number; html_url: string }>(P, ctx.userId, `/repos/${owner}/${repo}/issues`, {
+        method: "POST", extraHeaders: GH_HDR, body: { title, body, labels },
+      });
+      return { issue_number: data.number, url: data.html_url };
+    } catch { return notConnected("GitHub"); }
   },
 };
 

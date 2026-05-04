@@ -1,60 +1,47 @@
-import type { Tool } from "./types.ts";
-import { getProviderToken, notConnectedResult } from "./_connections.ts";
+import type { Tool, ToolContext } from "./types.ts";
+import { nangoJSON, notConnected } from "./_nango.ts";
 
-async function slackGet(path: string, token: string, params: Record<string, string> = {}) {
-  const url = new URL(`https://slack.com/api/${path}`);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  return (await fetch(url, { headers: { Authorization: `Bearer ${token}` } })).json();
-}
+const P = "slack";
 
-async function resolveChannelId(channel: string, token: string): Promise<string | null> {
-  if (channel.startsWith("C") || channel.startsWith("D") || channel.startsWith("G")) return channel;
-  const list = await slackGet("conversations.list", token, { limit: "500", types: "public_channel,private_channel" });
-  const name = channel.replace(/^#/, "");
-  const found = list.channels?.find((c: { name: string }) => c.name === name);
-  return found?.id ?? null;
+async function resolveChannel(name: string, userId: string): Promise<string | null> {
+  if (/^[CDG]/.test(name)) return name;
+  const data = await nangoJSON<{ channels?: { id: string; name: string }[] }>(P, userId, "/conversations.list?limit=500&types=public_channel,private_channel");
+  const clean = name.replace(/^#/, "");
+  return data.channels?.find((c) => c.name === clean)?.id ?? null;
 }
 
 const slackSummarise: Tool<{ channel: string; since_hours?: number }, unknown> = {
   name: "slack_summarise",
-  description: "Fetch recent messages from a Slack channel for summarisation.",
+  description: "Fetch recent Slack channel messages for summarisation.",
   parameters: {
     type: "object",
     properties: {
-      channel: { type: "string", description: "Channel name (without #) or channel ID." },
-      since_hours: { type: "number", description: "How many hours back (default 24)." },
+      channel: { type: "string", description: "Channel name (without #) or ID." },
+      since_hours: { type: "number", description: "Hours back to fetch (default 24)." },
     },
     required: ["channel"],
   },
-  async execute({ channel, since_hours = 24 }, ctx) {
-    const token = await getProviderToken(ctx, "slack");
-    if (!token) return notConnectedResult("Slack");
-    const channelId = await resolveChannelId(channel, token);
-    if (!channelId) return { error: `Channel ${channel} not found` };
-    const oldest = String((Date.now() / 1000) - since_hours * 3600);
-    const history = await slackGet("conversations.history", token, { channel: channelId, oldest, limit: "50" });
-    return {
-      channel,
-      messages: (history.messages ?? []).map((m: { user: string; text: string; ts: string; thread_ts?: string }) => ({
-        user: m.user, text: m.text, ts: m.ts, thread_ts: m.thread_ts,
-      })),
-    };
+  async execute({ channel, since_hours = 24 }, ctx: ToolContext) {
+    try {
+      const id = await resolveChannel(channel, ctx.userId);
+      if (!id) return { error: `Channel '${channel}' not found` };
+      const oldest = String(Date.now() / 1000 - since_hours * 3600);
+      const data = await nangoJSON<{ messages?: unknown[] }>(P, ctx.userId, `/conversations.history?channel=${id}&oldest=${oldest}&limit=50`);
+      return { channel, messages: data.messages ?? [] };
+    } catch { return notConnected("Slack"); }
   },
 };
 
 const slackDraft: Tool<{ channel: string; text: string }, unknown> = {
   name: "slack_draft",
-  description: "Preview a Slack message draft (does NOT send).",
+  description: "Preview a Slack message (does NOT send). Show to user before calling slack_send.",
   parameters: {
     type: "object",
-    properties: {
-      channel: { type: "string", description: "Target channel name or ID." },
-      text: { type: "string", description: "Message text." },
-    },
+    properties: { channel: { type: "string" }, text: { type: "string" } },
     required: ["channel", "text"],
   },
   async execute({ channel, text }) {
-    return { preview: { channel, text }, instruction: "Show this draft to the user and ask for confirmation before calling slack_send." };
+    return { preview: { channel, text }, instruction: "Confirm with user before calling slack_send." };
   },
 };
 
@@ -63,25 +50,19 @@ const slackSend: Tool<{ channel: string; text: string }, unknown> = {
   description: "Send a Slack message. Use ONLY after explicit user confirmation.",
   parameters: {
     type: "object",
-    properties: {
-      channel: { type: "string", description: "Channel name (without #) or channel ID." },
-      text: { type: "string", description: "Message text." },
-    },
+    properties: { channel: { type: "string" }, text: { type: "string" } },
     required: ["channel", "text"],
   },
-  async execute({ channel, text }, ctx) {
-    const token = await getProviderToken(ctx, "slack");
-    if (!token) return notConnectedResult("Slack");
-    const channelId = await resolveChannelId(channel, token);
-    if (!channelId) return { error: `Channel ${channel} not found` };
-    const res = await fetch("https://slack.com/api/chat.postMessage", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ channel: channelId, text }),
-    });
-    const data = await res.json();
-    if (!data.ok) return { error: `Slack error: ${data.error}` };
-    return { ts: data.ts, channel: data.channel };
+  async execute({ channel, text }, ctx: ToolContext) {
+    try {
+      const id = await resolveChannel(channel, ctx.userId) ?? channel;
+      const data = await nangoJSON<{ ok: boolean; ts: string; error?: string }>(P, ctx.userId, "/chat.postMessage", {
+        method: "POST",
+        body: { channel: id, text },
+      });
+      if (!data.ok) return { error: `Slack: ${data.error}` };
+      return { ts: data.ts, channel: id };
+    } catch { return notConnected("Slack"); }
   },
 };
 
