@@ -1,4 +1,11 @@
 import type { Tool } from "./types.ts";
+import { gmailTools } from "./gmail.ts";
+import { calendarTools } from "./calendar.ts";
+import { slackTools } from "./slack.ts";
+import { notionTools } from "./notion.ts";
+import { githubTools } from "./github.ts";
+import { linearTools } from "./linear.ts";
+import { driveTools } from "./drive.ts";
 
 const calculate: Tool<{ expression: string }, { result: number | string; expression: string }> = {
   name: "calculate",
@@ -18,7 +25,6 @@ const calculate: Tool<{ expression: string }, { result: number | string; express
     if (!/^[\d+\-*/%().,\s]+$/.test(expression)) {
       return { result: "refused: only digits, decimals, and + - * / % ( ) are allowed", expression };
     }
-    // Function constructor in a sandboxed scope. The character whitelist above is the gate.
     const result = Function(`"use strict"; return (${expression});`)() as number;
     return { result, expression };
   },
@@ -30,14 +36,8 @@ const recallMemory: Tool<{ query?: string; limit?: number }, { memories: string[
   parameters: {
     type: "object",
     properties: {
-      query: {
-        type: "string",
-        description: "Optional substring filter (case-insensitive).",
-      },
-      limit: {
-        type: "string",
-        description: "Optional cap on number of memories returned (default 10, max 50).",
-      },
+      query: { type: "string", description: "Optional substring filter (case-insensitive)." },
+      limit: { type: "string", description: "Optional cap on number of memories returned (default 10, max 50)." },
     },
   },
   async execute({ query, limit }, ctx) {
@@ -64,4 +64,11 @@ const recallMemory: Tool<{ query?: string; limit?: number }, { memories: string[
 export const defaultTools: Tool[] = [
   calculate as unknown as Tool,
   recallMemory as unknown as Tool,
+  ...gmailTools,
+  ...calendarTools,
+  ...slackTools,
+  ...notionTools,
+  ...githubTools,
+  ...linearTools,
+  ...driveTools,
 ];
