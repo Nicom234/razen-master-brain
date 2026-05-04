@@ -1,7 +1,104 @@
 import type { SkillManifest } from "./types.ts";
 
-// Five default skills. Each maps roughly to one of OpenClaw's `skills/*/SKILL.md`
-// files but distilled to behaviour Razen actually exposes.
+// Workspace Assistant skills.
+//
+// Each skill describes a class of everyday work the assistant can take ownership of.
+// Skills marked `requiresConnection` only auto-activate once the user has linked
+// the underlying integration; otherwise the assistant explains how to connect it.
+//
+// The skill manifests intentionally describe behaviour, not OAuth wiring — the
+// per-integration auth lives in `supabase/functions/integrations-*` (to be added
+// per provider) and is gated by the `connections` table.
+
+const inboxTriage: SkillManifest = {
+  name: "inbox-triage",
+  emoji: "📥",
+  description: "Triage email — summarise threads, draft replies, surface what actually needs the user.",
+  whenToUse: [
+    "User asks about their email, unread, inbox, or a sender",
+    "User wants drafts for replies or follow-ups",
+    "User wants a daily/weekly inbox digest",
+  ],
+  whenNotToUse: [
+    "Cold outreach to people the user has never met",
+    "Bulk send / merge — always confirm before sending more than one email",
+  ],
+  systemPrompt:
+    "For each thread, give a one-line read of the ask, then either a recommended action or a draft reply. Default to drafting; only send if the user said go.",
+  toolNames: ["list_emails", "draft_email", "send_email"],
+};
+
+const calendarOps: SkillManifest = {
+  name: "calendar-ops",
+  emoji: "🗓️",
+  description: "Read, plan, and schedule — find time, draft invites, prep briefings before meetings.",
+  whenToUse: [
+    "User asks about their calendar, today, this week, free time, or scheduling",
+    "User wants a meeting prepped, summarised, or rescheduled",
+  ],
+  whenNotToUse: [
+    "Booking restaurants / flights / hotels — those are external",
+  ],
+  systemPrompt:
+    "Always show the time in the user's timezone. When proposing slots, give 2–3 options, not a wall of times.",
+  toolNames: ["list_events", "find_free_time", "create_event"],
+};
+
+const slackChannel: SkillManifest = {
+  name: "slack-channel",
+  emoji: "💬",
+  description: "Summarise channels and DMs, draft messages, surface threads that mention the user.",
+  whenToUse: [
+    "User asks 'what did I miss', 'catch me up on #channel', or wants a Slack digest",
+    "User wants a message drafted in a specific channel's tone",
+  ],
+  whenNotToUse: [
+    "Mass DMs — always confirm before sending to more than one person",
+  ],
+  toolNames: ["slack_summarise", "slack_draft", "slack_send"],
+};
+
+const notionDocs: SkillManifest = {
+  name: "notion-docs",
+  emoji: "📝",
+  description: "Read, draft, and update Notion pages — PRDs, meeting notes, weekly updates.",
+  whenToUse: [
+    "User asks for a doc, PRD, brief, or weekly update",
+    "User wants to update or extend an existing Notion page",
+  ],
+  whenNotToUse: [
+    "Casual scratchpad notes — keep those in chat unless the user asks to file them",
+  ],
+  toolNames: ["notion_search", "notion_read", "notion_create", "notion_update"],
+};
+
+const linearTickets: SkillManifest = {
+  name: "linear-tickets",
+  emoji: "🔄",
+  description: "File, update, and triage Linear issues. Group bugs, link PRs, set sensible priority.",
+  whenToUse: [
+    "User describes a bug, task, or feature in a way that should be tracked",
+    "User asks about ticket status or sprint progress",
+  ],
+  whenNotToUse: [
+    "Pure brainstorming — don't file ideas as tickets unless the user asks",
+  ],
+  toolNames: ["linear_create", "linear_search", "linear_update"],
+};
+
+const githubOps: SkillManifest = {
+  name: "github-ops",
+  emoji: "🐙",
+  description: "Read PRs, summarise diffs, draft review comments, open issues.",
+  whenToUse: [
+    "User asks about a PR, repo, issue, or wants a code summary",
+    "User wants help replying to a code review",
+  ],
+  whenNotToUse: [
+    "Writing brand-new production code — use the Build mode for that",
+  ],
+  toolNames: ["github_pr_read", "github_pr_comment", "github_issue_create"],
+};
 
 const webResearch: SkillManifest = {
   name: "web-research",
@@ -38,40 +135,6 @@ const memoryRecall: SkillManifest = {
   match: (input) => input.tier !== "free" && (input.memories?.length ?? 0) > 0,
 };
 
-const codingAssist: SkillManifest = {
-  name: "coding-assist",
-  emoji: "💻",
-  description: "Write, debug, and explain production-quality code in any language.",
-  whenToUse: [
-    "User asks to write, fix, or explain code",
-    "User pastes a stack trace, error, or snippet",
-    "User asks about an API, library, or framework",
-  ],
-  whenNotToUse: [
-    "Pure prose tasks",
-    "Decisions that should happen before any code is written",
-  ],
-  systemPrompt:
-    "Default to runnable, idiomatic code. Use the right language for the task. Add a one-line comment only when the *why* is non-obvious. Show full files only when asked.",
-};
-
-const writingAssist: SkillManifest = {
-  name: "writing-assist",
-  emoji: "✍️",
-  description: "Editorial-grade drafting, polishing, and rewriting.",
-  whenToUse: [
-    "Drafting emails, posts, copy, essays, or scripts",
-    "Polishing or rewriting prose the user pasted",
-    "Asking for a specific voice, tone, or audience",
-  ],
-  whenNotToUse: [
-    "Asking factual questions about real-world events",
-    "Asking for code or data",
-  ],
-  systemPrompt:
-    "Match the user's target register exactly. Prefer precise modern language over generic marketing fluff. Return polished output, not process notes.",
-};
-
 const calc: SkillManifest = {
   name: "calculator",
   emoji: "🧮",
@@ -88,9 +151,13 @@ const calc: SkillManifest = {
 };
 
 export const defaultSkills: SkillManifest[] = [
+  inboxTriage,
+  calendarOps,
+  slackChannel,
+  notionDocs,
+  linearTickets,
+  githubOps,
   webResearch,
   memoryRecall,
-  codingAssist,
-  writingAssist,
   calc,
 ];

@@ -9,14 +9,15 @@ import {
   Globe,
   Paperclip,
   X,
-  Wand2,
-  Brain,
-  Code2,
-  PenTool,
-  Search,
-  ListChecks,
   Plug,
-  Zap,
+  Inbox,
+  Calendar,
+  MessageCircle,
+  FileText,
+  GitBranch,
+  ListChecks,
+  Folder,
+  Mic,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,19 +39,23 @@ type Props = {
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent`;
 
 const SUGGESTED = [
-  { icon: Search, label: "Compare two products", prompt: "Compare Notion AI and ClickUp Brain for a 50-person ops team — cite sources." },
-  { icon: PenTool, label: "Write a cold email", prompt: "Write a 3-line cold email to a Series B head of marketing pitching a meeting AI called Quill." },
-  { icon: Code2, label: "Debug something", prompt: "Why does my React useEffect run twice in dev and how do I stop it without disabling Strict Mode?" },
-  { icon: ListChecks, label: "Plan a launch", prompt: "Give me a tight 14-day launch plan for a paid newsletter aimed at product designers." },
-  { icon: Brain, label: "Personal advice", prompt: "I'm scared to negotiate my offer. Coach me through it — what to say, in what order." },
-  { icon: Wand2, label: "Random side-quest", prompt: "Plan a 36-hour solo trip to Lisbon for someone who likes coffee, swimming, and bookshops." },
+  { icon: Inbox, label: "Triage my inbox", prompt: "Catch me up on my inbox — surface what actually needs me, draft replies for the rest." },
+  { icon: Calendar, label: "Plan my day", prompt: "Plan my day. What's on my calendar, what should I push, and what should I prep for first?" },
+  { icon: MessageCircle, label: "Slack catch-up", prompt: "What did I miss in #product and #eng since yesterday? Bullet the threads that mention me." },
+  { icon: FileText, label: "Draft a doc", prompt: "Draft a 1-page PRD for a Stripe-style /share-link page in our voice. File it in Notion." },
+  { icon: GitBranch, label: "PR review", prompt: "Look at my open PRs and give me a one-liner status for each, with what's blocking." },
+  { icon: ListChecks, label: "Weekly update", prompt: "Write my Friday weekly update from this week's tickets, PRs, and Slack notes." },
 ];
 
-const CAPABILITIES = [
-  { icon: Globe, title: "Live web research", body: "Real sources, real citations. No invented links, ever." },
-  { icon: Brain, title: "Remembers you", body: "Pro and Elite users get long-term memory across chats." },
-  { icon: Plug, title: "Skills + tools", body: "Calls a skill (web, memory, calculator, code) only when it actually helps." },
-  { icon: Zap, title: "Fast and decisive", body: "Streams answers token-by-token. No filler, no hedging." },
+const INTEGRATIONS: { name: string; icon: typeof Inbox; status: "connected" | "available" }[] = [
+  { name: "Gmail", icon: Inbox, status: "available" },
+  { name: "Calendar", icon: Calendar, status: "available" },
+  { name: "Slack", icon: MessageCircle, status: "available" },
+  { name: "Notion", icon: FileText, status: "available" },
+  { name: "GitHub", icon: GitBranch, status: "available" },
+  { name: "Linear", icon: ListChecks, status: "available" },
+  { name: "Drive", icon: Folder, status: "available" },
+  { name: "Voice", icon: Mic, status: "available" },
 ];
 
 export function RazenAssistant({ tier, onCreditsChange }: Props) {
@@ -263,7 +268,7 @@ export function RazenAssistant({ tier, onCreditsChange }: Props) {
               {streaming && messages[messages.length - 1]?.role === "user" && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-                  Thinking…
+                  Working…
                 </div>
               )}
             </div>
@@ -292,7 +297,7 @@ export function RazenAssistant({ tier, onCreditsChange }: Props) {
                   send();
                 }
               }}
-              placeholder="Ask Razen anything…"
+              placeholder="What should I take care of?"
               rows={1}
               className="min-h-[52px] resize-none border-0 bg-transparent px-4 py-3.5 text-base focus-visible:ring-0"
             />
@@ -334,7 +339,7 @@ export function RazenAssistant({ tier, onCreditsChange }: Props) {
             </div>
           </div>
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            Razen can make mistakes. Cross-check anything important.
+            Razen runs on Gemini Flash 3. Confirm before anything sends to a real inbox or channel.
           </p>
         </div>
       </div>
@@ -349,15 +354,15 @@ function Hero({ onPick }: { onPick: (p: string) => void }) {
         <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-foreground text-background">
           <Sparkles className="h-7 w-7" />
         </div>
-        <h1 className="font-display text-4xl tracking-tight md:text-5xl">Ask Razen anything.</h1>
-        <p className="mx-auto mt-3 max-w-xl text-lg text-muted-foreground">
-          Your AI employee for research, writing, code, planning, and life admin. One chat. No mode-switching. No fluff.
+        <h1 className="font-display text-4xl tracking-tight md:text-5xl">Your workspace, on autopilot.</h1>
+        <p className="mx-auto mt-3 max-w-2xl text-lg text-muted-foreground">
+          Razen takes ownership of the everyday work — inbox, calendar, Slack, Notion, GitHub, Linear. You ask. Razen handles the rest.
         </p>
       </div>
 
       <div>
         <p className="mb-3 text-center text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Try one of these
+          What should Razen do today
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {SUGGESTED.map((s) => {
@@ -384,21 +389,38 @@ function Hero({ onPick }: { onPick: (p: string) => void }) {
       </div>
 
       <div>
-        <p className="mb-3 text-center text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          What makes it different
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {CAPABILITIES.map((c) => {
-            const Icon = c.icon;
+        <div className="mb-3 flex items-center justify-center gap-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Connect your stack
+          </p>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Beta
+          </span>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {INTEGRATIONS.map((it) => {
+            const Icon = it.icon;
             return (
-              <div key={c.title} className="rounded-2xl border border-border/70 bg-card/40 p-4">
-                <Icon className="h-5 w-5 text-primary" />
-                <div className="mt-3 text-sm font-semibold">{c.title}</div>
-                <p className="mt-1 text-xs text-muted-foreground">{c.body}</p>
+              <div
+                key={it.name}
+                className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-4 py-3"
+              >
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-background">
+                  <Icon className="h-4 w-4 text-foreground" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold">{it.name}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {it.status === "connected" ? "Connected" : "Tap to connect"}
+                  </div>
+                </div>
               </div>
             );
           })}
         </div>
+        <p className="mt-3 text-center text-[11px] text-muted-foreground">
+          Razen will ask before doing anything that sends, schedules, or files — always.
+        </p>
       </div>
     </div>
   );
