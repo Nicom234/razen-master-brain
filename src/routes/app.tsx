@@ -60,7 +60,7 @@ function readWsSessions(m: Mode): WsSession[] {
 }
 
 const MODES: { id: Mode; label: string; icon: typeof Search; hint: string }[] = [
-  { id: "research", label: "Chat", icon: Sparkles, hint: "Ask anything — research, writing, code, planning, life" },
+  { id: "research", label: "Workspace", icon: Sparkles, hint: "Agentic everyday work — inbox, calendar, Slack, docs" },
   { id: "write", label: "Write", icon: PenTool, hint: "Editorial-grade drafting and polishing" },
   { id: "plan", label: "Plan", icon: ListChecks, hint: "Structured plans with owners and risks" },
   { id: "build", label: "Build", icon: Code2, hint: "Production-quality runnable code" },
@@ -420,7 +420,7 @@ function AppPage() {
         <div className="px-3 pb-3">
           {mode === "research" && (
             <Button onClick={newChat} variant="outline" className="w-full justify-start gap-2 h-9">
-              <Plus className="h-4 w-4" />New chat
+              <Plus className="h-4 w-4" />New task
             </Button>
           )}
           {mode === "write" && (
@@ -442,7 +442,7 @@ function AppPage() {
 
         <div className="flex-1 overflow-y-auto px-2 pb-2">
           <p className="px-2 pb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            {mode === "research" ? "Recent chats" : mode === "write" ? "Documents" : mode === "build" ? "Builds" : mode === "plan" ? "Plans" : "Recent chats"}
+            {mode === "research" ? "Recent tasks" : mode === "write" ? "Documents" : mode === "build" ? "Builds" : mode === "plan" ? "Plans" : "Recent tasks"}
           </p>
           {mode === "research" ? (
             convs.length > 0 ? (
@@ -467,7 +467,7 @@ function AppPage() {
                 </div>
               ))
             ) : (
-              <p className="px-2 text-xs text-muted-foreground">Nothing yet — say hi above.</p>
+              <p className="px-2 text-xs text-muted-foreground">Nothing yet — give Razen a task above.</p>
             )
           ) : mode !== "plan" && wsSessions.length > 0 ? (
             wsSessions.map((s) => (
