@@ -4,21 +4,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import {
-  ArrowUp,
-  Sparkles,
-  Globe,
-  Paperclip,
-  X,
-  Plug,
-  Check,
-  Inbox,
-  Calendar,
-  MessageCircle,
-  FileText,
-  GitBranch,
-  ListChecks,
-  Folder,
-  Mic,
+  ArrowUp, Sparkles, Globe, Paperclip, X, Plug, Check,
+  Inbox, Calendar, MessageCircle, FileText, GitBranch, ListChecks,
+  Folder, Mic, Mail, Users, BarChart2, CheckSquare, Video,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,7 +16,11 @@ import { supabase } from "@/integrations/supabase/client";
 type Source = { n: number; title: string; url: string; domain: string };
 type Msg = { role: "user" | "assistant"; content: string; sources?: Source[]; skills?: string[] };
 type Tier = "free" | "pro" | "elite";
-type Provider = "gmail" | "slack" | "notion" | "github" | "linear" | "drive";
+type Provider =
+  | "gmail" | "google-calendar" | "google-drive"
+  | "slack" | "notion" | "github" | "linear"
+  | "microsoft-mail" | "microsoft-teams"
+  | "jira" | "asana" | "hubspot" | "zoom";
 
 type Props = {
   tier: Tier;
@@ -49,15 +41,26 @@ const SUGGESTED = [
   { icon: ListChecks, label: "Weekly update", prompt: "Write my Friday weekly update from this week's tickets, PRs, and Slack notes." },
 ];
 
-const INTEGRATIONS: { name: string; icon: typeof Inbox; provider: Provider | null; sharesWith?: Provider }[] = [
+const INTEGRATIONS: {
+  name: string;
+  icon: typeof Inbox;
+  provider: Provider | null;
+  label?: string;
+}[] = [
   { name: "Gmail", icon: Inbox, provider: "gmail" },
-  { name: "Calendar", icon: Calendar, provider: null, sharesWith: "gmail" },
+  { name: "Calendar", icon: Calendar, provider: "google-calendar" },
+  { name: "Drive", icon: Folder, provider: "google-drive" },
   { name: "Slack", icon: MessageCircle, provider: "slack" },
   { name: "Notion", icon: FileText, provider: "notion" },
   { name: "GitHub", icon: GitBranch, provider: "github" },
   { name: "Linear", icon: ListChecks, provider: "linear" },
-  { name: "Drive", icon: Folder, provider: "drive" },
-  { name: "Voice", icon: Mic, provider: null },
+  { name: "Outlook", icon: Mail, provider: "microsoft-mail" },
+  { name: "Teams", icon: Users, provider: "microsoft-teams" },
+  { name: "Jira", icon: CheckSquare, provider: "jira" },
+  { name: "Asana", icon: CheckSquare, provider: "asana" },
+  { name: "HubSpot", icon: BarChart2, provider: "hubspot" },
+  { name: "Zoom", icon: Video, provider: "zoom" },
+  { name: "Voice", icon: Mic, provider: null, label: "Coming soon" },
 ];
 
 export function RazenAssistant({ tier, onCreditsChange }: Props) {
@@ -69,32 +72,27 @@ export function RazenAssistant({ tier, onCreditsChange }: Props) {
   const [attachment, setAttachment] = useState<{ name: string; dataUrl: string; type: string } | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [activeSkills, setActiveSkills] = useState<string[]>([]);
-  const [connected, setConnected] = useState<Set<Provider>>(new Set());
+  const [connected, setConnected] = useState<Set<string>>(new Set());
   const [connecting, setConnecting] = useState<Provider | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const loadConnections = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase.from("connections").select("provider").eq("user_id", user.id);
-    setConnected(new Set((data ?? []).map((c: { provider: string }) => c.provider as Provider)));
+    const { data } = await supabase.functions.invoke("integrations-connections");
+    setConnected(new Set<string>((data?.providers ?? []) as string[]));
   }, [user]);
 
-  useEffect(() => {
-    void loadConnections();
-  }, [loadConnections]);
+  useEffect(() => { void loadConnections(); }, [loadConnections]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const c = params.get("connected");
     const e = params.get("error");
-    if (c) {
-      toast.success(`${c.charAt(0).toUpperCase() + c.slice(1)} connected.`);
+    if (c || e) {
       window.history.replaceState({}, "", window.location.pathname);
-      void loadConnections();
-    } else if (e) {
-      toast.error(`Connection failed: ${e}`);
-      window.history.replaceState({}, "", window.location.pathname);
+      if (c) { toast.success(`${c} connected.`); void loadConnections(); }
+      else if (e) toast.error(`Connection failed: ${e}`);
     }
   }, [loadConnections]);
 
@@ -106,24 +104,22 @@ export function RazenAssistant({ tier, onCreditsChange }: Props) {
     if (!user || connecting) return;
     setConnecting(provider);
     try {
-      const { data, error } = await supabase.functions.invoke(`integrations-${provider}-connect`);
-      if (error || !data?.url) {
-        toast.error(`Could not start ${provider} connection${error?.message ? `: ${error.message}` : ""}`);
+      const { data: sessionData, error: sessionErr } = await supabase.functions.invoke("integrations-session", {
+        body: { integration: provider },
+      });
+      if (sessionErr || !sessionData?.session_token) {
+        toast.error(`Could not start ${provider} connection${sessionErr?.message ? `: ${sessionErr.message}` : ""}`);
         return;
       }
-      const popup = window.open(data.url as string, "_blank", "width=600,height=720");
-      if (!popup) {
-        window.location.href = data.url as string;
-        return;
-      }
-      const interval = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(interval);
-          void loadConnections();
-        }
-      }, 800);
+      const { default: Nango } = await import("@nangohq/frontend");
+      const nango = new Nango({ publicKey: sessionData.public_key as string });
+      await nango.openConnectUI({ sessionToken: sessionData.session_token as string });
+      await loadConnections();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : `Could not connect ${provider}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.toLowerCase().includes("closed") && !msg.toLowerCase().includes("cancel")) {
+        toast.error(`Connection failed: ${msg.slice(0, 80)}`);
+      }
     } finally {
       setConnecting(null);
     }
@@ -132,62 +128,41 @@ export function RazenAssistant({ tier, onCreditsChange }: Props) {
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (tier === "free") {
-      toast.error("File upload is a Pro feature.");
-      return;
-    }
-    if (f.size > 10 * 1024 * 1024) {
-      toast.error("Max 10MB.");
-      return;
-    }
+    if (tier === "free") { toast.error("File upload is a Pro feature."); return; }
+    if (f.size > 10 * 1024 * 1024) { toast.error("Max 10MB."); return; }
     const reader = new FileReader();
-    reader.onload = () =>
-      setAttachment({ name: f.name, dataUrl: reader.result as string, type: f.type });
+    reader.onload = () => setAttachment({ name: f.name, dataUrl: reader.result as string, type: f.type });
     reader.readAsDataURL(f);
   };
 
   const send = async () => {
     const text = input.trim();
     if ((!text && !attachment) || streaming || !user) return;
-
     const userContent = attachment ? `[Attached: ${attachment.name}]\n\n${text}` : text;
-    const userMsg: Msg = { role: "user", content: userContent };
-    const next = [...messages, userMsg];
+    const next = [...messages, { role: "user" as const, content: userContent }];
     setMessages(next);
     setInput("");
     const att = attachment;
     setAttachment(null);
     setStreaming(true);
     setActiveSkills([]);
-
     let acc = "";
     const upsert = (delta: string) => {
       acc += delta;
       const { display, sources } = splitSources(acc);
       setMessages((prev) => {
         const last = prev[prev.length - 1];
-        if (last?.role === "assistant") {
-          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: display, sources } : m));
-        }
-        return [...prev, { role: "assistant", content: display, sources }];
+        if (last?.role === "assistant") return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: display, sources } : m));
+        return [...prev, { role: "assistant" as const, content: display, sources }];
       });
     };
-
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const apiMessages = next.map((m, i) => {
-        if (i === next.length - 1 && att) {
-          return {
-            role: m.role,
-            content: [
-              { type: "text", text: text || "Take a look." },
-              { type: "image_url", image_url: { url: att.dataUrl } },
-            ],
-          };
-        }
+        if (i === next.length - 1 && att)
+          return { role: m.role, content: [{ type: "text", text: text || "Take a look." }, { type: "image_url", image_url: { url: att.dataUrl } }] };
         return m;
       });
-
       const resp = await fetch(FN_URL, {
         method: "POST",
         headers: {
@@ -196,76 +171,47 @@ export function RazenAssistant({ tier, onCreditsChange }: Props) {
         },
         body: JSON.stringify({ messages: apiMessages, useWebSearch, conversationId }),
       });
-
       const remaining = resp.headers.get("X-Credits-Remaining");
       if (remaining) onCreditsChange(Number(remaining));
       const cid = resp.headers.get("X-Conversation-Id");
       if (cid) setConversationId(cid);
-
       if (!resp.ok) {
         let msg = `Error ${resp.status}`;
-        try {
-          const e = await resp.json();
-          if (e.error) msg = e.error;
-        } catch {
-          /* ignore */
-        }
-        toast.error(msg);
-        setStreaming(false);
-        return;
+        try { const e = await resp.json(); if (e.error) msg = e.error; } catch { /* ignore */ }
+        toast.error(msg); setStreaming(false); return;
       }
       if (!resp.body) throw new Error("No stream");
-
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
-      let buf = "";
-      let done = false;
-      let currentEvent = "message";
+      let buf = ""; let done = false; let currentEvent = "message";
       while (!done) {
         const r = await reader.read();
         if (r.done) break;
         buf += decoder.decode(r.value, { stream: true });
         let idx;
         while ((idx = buf.indexOf("\n")) !== -1) {
-          let line = buf.slice(0, idx);
-          buf = buf.slice(idx + 1);
+          let line = buf.slice(0, idx); buf = buf.slice(idx + 1);
           if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line) {
-            currentEvent = "message";
-            continue;
-          }
+          if (!line) { currentEvent = "message"; continue; }
           if (line.startsWith(":")) continue;
-          if (line.startsWith("event: ")) {
-            currentEvent = line.slice(7).trim();
-            continue;
-          }
+          if (line.startsWith("event: ")) { currentEvent = line.slice(7).trim(); continue; }
           if (!line.startsWith("data: ")) continue;
           const json = line.slice(6).trim();
-          if (json === "[DONE]") {
-            done = true;
-            break;
-          }
+          if (json === "[DONE]") { done = true; break; }
           try {
             const p = JSON.parse(json);
             if (currentEvent === "agent") {
-              if (p.type === "skill.activated") {
-                setActiveSkills((s) => Array.from(new Set([...s, (p.data?.name as string) ?? ""])).filter(Boolean));
-              }
+              if (p.type === "skill.activated") setActiveSkills((s) => Array.from(new Set([...s, (p.data?.name as string) ?? ""])).filter(Boolean));
               continue;
             }
             const c = p.choices?.[0]?.delta?.content;
             if (c) upsert(c);
-          } catch {
-            buf = line + "\n" + buf;
-            break;
-          }
+          } catch { buf = line + "\n" + buf; break; }
         }
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Stream failed");
-    } finally {
-      setStreaming(false);
-    }
+    } finally { setStreaming(false); }
   };
 
   return (
@@ -273,47 +219,29 @@ export function RazenAssistant({ tier, onCreditsChange }: Props) {
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-10">
           {messages.length === 0 ? (
-            <Hero
-              onPick={(p) => setInput(p)}
-              connected={connected}
-              connecting={connecting}
-              onConnect={connectProvider}
-            />
+            <Hero onPick={(p) => setInput(p)} connected={connected} connecting={connecting} onConnect={connectProvider} />
           ) : (
             <div className="space-y-6">
               {activeSkills.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {activeSkills.map((s) => (
-                    <span
-                      key={s}
-                      className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary"
-                    >
-                      <Plug className="h-3 w-3" />
-                      {s}
+                    <span key={s} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary">
+                      <Plug className="h-3 w-3" />{s}
                     </span>
                   ))}
                 </div>
               )}
               {messages.map((m, i) => (
                 <div key={i} className={m.role === "user" ? "flex justify-end" : ""}>
-                  <div
-                    className={
-                      m.role === "user"
-                        ? "max-w-[85%] rounded-2xl bg-foreground px-4 py-3 text-sm text-background"
-                        : "max-w-full"
-                    }
-                  >
+                  <div className={m.role === "user" ? "max-w-[85%] rounded-2xl bg-foreground px-4 py-3 text-sm text-background" : "max-w-full"}>
                     {m.role === "assistant" ? (
                       <div className="space-y-3">
                         <div className="prose-chat">
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypeHighlight]}
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}
                             components={{
                               p: ({ children }) => <p>{renderCitations(children, m.sources)}</p>,
                               li: ({ children }) => <li>{renderCitations(children, m.sources)}</li>,
-                            }}
-                          >
+                            }}>
                             {m.content || "…"}
                           </ReactMarkdown>
                         </div>
@@ -340,60 +268,30 @@ export function RazenAssistant({ tier, onCreditsChange }: Props) {
         <div className="mx-auto max-w-3xl px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">
           {attachment && (
             <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1 text-xs">
-              <Paperclip className="h-3 w-3" />
-              {attachment.name}
-              <button onClick={() => setAttachment(null)}>
-                <X className="h-3 w-3" />
-              </button>
+              <Paperclip className="h-3 w-3" />{attachment.name}
+              <button onClick={() => setAttachment(null)}><X className="h-3 w-3" /></button>
             </div>
           )}
           <div className="rounded-2xl border border-border/70 bg-card shadow-soft transition focus-within:border-primary/40 focus-within:shadow-card">
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  send();
-                }
-              }}
-              placeholder="What should I take care of?"
-              rows={1}
-              className="min-h-[52px] resize-none border-0 bg-transparent px-4 py-3.5 text-base focus-visible:ring-0"
-            />
+            <Textarea value={input} onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+              placeholder="What should I take care of?" rows={1}
+              className="min-h-[52px] resize-none border-0 bg-transparent px-4 py-3.5 text-base focus-visible:ring-0" />
             <div className="flex items-center justify-between gap-2 px-3 pb-2.5">
               <div className="flex items-center gap-1">
-                <button
-                  onClick={() => fileRef.current?.click()}
+                <button onClick={() => fileRef.current?.click()}
                   className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                  title={tier === "free" ? "Upgrade to Pro for files" : "Attach file or image"}
-                >
+                  title={tier === "free" ? "Upgrade to Pro for files" : "Attach file or image"}>
                   <Paperclip className="h-4 w-4" />
                 </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*,application/pdf"
-                  onChange={onFile}
-                  className="hidden"
-                />
-                <button
-                  onClick={() => setUseWebSearch((v) => !v)}
+                <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={onFile} className="hidden" />
+                <button onClick={() => setUseWebSearch((v) => !v)}
                   className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition ${
-                    useWebSearch ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
-                  }`}
-                  title="Toggle live web search"
-                >
-                  <Globe className="h-3.5 w-3.5" />
-                  Web
+                    useWebSearch ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`}>
+                  <Globe className="h-3.5 w-3.5" />Web
                 </button>
               </div>
-              <Button
-                onClick={send}
-                disabled={(!input.trim() && !attachment) || streaming}
-                size="icon"
-                className="h-9 w-9 rounded-full"
-              >
+              <Button onClick={send} disabled={(!input.trim() && !attachment) || streaming} size="icon" className="h-9 w-9 rounded-full">
                 <ArrowUp className="h-4 w-4" />
               </Button>
             </div>
@@ -407,14 +305,9 @@ export function RazenAssistant({ tier, onCreditsChange }: Props) {
   );
 }
 
-function Hero({
-  onPick,
-  connected,
-  connecting,
-  onConnect,
-}: {
+function Hero({ onPick, connected, connecting, onConnect }: {
   onPick: (p: string) => void;
-  connected: Set<Provider>;
+  connected: Set<string>;
   connecting: Provider | null;
   onConnect: (p: Provider) => void;
 }) {
@@ -431,18 +324,13 @@ function Hero({
       </div>
 
       <div>
-        <p className="mb-3 text-center text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          What should Razen do today
-        </p>
+        <p className="mb-3 text-center text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">What should Razen do today</p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {SUGGESTED.map((s) => {
             const Icon = s.icon;
             return (
-              <button
-                key={s.label}
-                onClick={() => onPick(s.prompt)}
-                className="group rounded-2xl border border-border/70 bg-card/60 p-4 text-left transition hover:border-border hover:bg-card hover:shadow-soft"
-              >
+              <button key={s.label} onClick={() => onPick(s.prompt)}
+                className="group rounded-2xl border border-border/70 bg-card/60 p-4 text-left transition hover:border-border hover:bg-card hover:shadow-soft">
                 <div className="flex items-start gap-3">
                   <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-foreground text-background transition group-hover:bg-primary group-hover:text-primary-foreground">
                     <Icon className="h-4 w-4" />
@@ -460,56 +348,33 @@ function Hero({
 
       <div>
         <div className="mb-3 flex items-center justify-center gap-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Connect your stack
-          </p>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            Beta
-          </span>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Connect your stack</p>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Beta</span>
         </div>
-        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {INTEGRATIONS.map((it) => {
             const Icon = it.icon;
-            const linkedProvider = it.provider ?? it.sharesWith ?? null;
-            const isConnected = linkedProvider ? connected.has(linkedProvider) : false;
-            const isConnecting = it.provider !== null && connecting === it.provider;
-            const clickable = it.provider !== null;
-            const handleClick = () => {
-              if (!clickable || isConnected) return;
-              onConnect(it.provider as Provider);
-            };
-            const status = isConnected
-              ? "Connected"
-              : isConnecting
-              ? "Opening…"
-              : it.sharesWith
-              ? `Connects with ${it.sharesWith.charAt(0).toUpperCase() + it.sharesWith.slice(1)}`
-              : clickable
-              ? "Tap to connect"
-              : "Coming soon";
+            const isConnected = it.provider ? connected.has(it.provider) : false;
+            const isConnecting = connecting === it.provider;
+            const clickable = it.provider !== null && !isConnected;
+            const statusLabel = isConnected ? "Connected" : isConnecting ? "Opening…" : it.label ?? (it.provider ? "Connect" : "Coming soon");
             return (
-              <button
-                key={it.name}
-                type="button"
-                onClick={handleClick}
-                disabled={!clickable || isConnected || isConnecting}
-                className={`flex items-center gap-3 rounded-xl border bg-card/40 px-4 py-3 text-left transition ${
-                  isConnected
-                    ? "border-primary/40 bg-primary/5"
-                    : clickable
-                    ? "border-border/70 hover:border-primary/40 hover:bg-card hover:shadow-soft"
-                    : "border-border/70 opacity-70"
-                }`}
-              >
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-background">
-                  <Icon className="h-4 w-4 text-foreground" />
+              <button key={it.name} type="button"
+                onClick={() => clickable && onConnect(it.provider as Provider)}
+                disabled={!clickable || isConnecting}
+                className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition ${
+                  isConnected ? "border-primary/40 bg-primary/5"
+                  : clickable ? "border-border/70 bg-card/40 hover:border-primary/40 hover:bg-card hover:shadow-soft"
+                  : "border-border/70 bg-card/20 opacity-60"
+                }`}>
+                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-background">
+                  <Icon className="h-3.5 w-3.5 text-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-sm font-semibold">
-                    {it.name}
-                    {isConnected && <Check className="h-3.5 w-3.5 text-primary" />}
+                  <div className="flex items-center gap-1 text-xs font-semibold">
+                    {it.name}{isConnected && <Check className="h-3 w-3 text-primary" />}
                   </div>
-                  <div className="text-[11px] text-muted-foreground">{status}</div>
+                  <div className={`text-[10px] truncate ${ isConnected ? "text-primary" : "text-muted-foreground"}`}>{statusLabel}</div>
                 </div>
               </button>
             );
@@ -539,51 +404,28 @@ function splitSources(raw: string): { display: string; sources: Source[] } {
           domain: typeof s.domain === "string" && s.domain ? s.domain : safeDomain(s.url),
         }));
     }
-  } catch {
-    // partial / streaming — ignore until complete
-  }
+  } catch { /* partial streaming — ignore */ }
   const display = raw.replace(/<<<SOURCES>>>[\s\S]*?<<<END>>>/, "").replace(/\s+$/, "");
   return { display, sources };
 }
 
 function safeDomain(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return "";
-  }
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; }
 }
 
 function renderCitations(children: React.ReactNode, sources?: Source[]): React.ReactNode {
-  if (!sources || sources.length === 0) return children;
+  if (!sources?.length) return children;
   const map = new Map(sources.map((s) => [s.n, s]));
   const transform = (node: React.ReactNode): React.ReactNode => {
     if (typeof node === "string") {
       const parts: React.ReactNode[] = [];
       const regex = /\[(\d+)\]/g;
-      let lastIndex = 0;
-      let match: RegExpExecArray | null;
-      let key = 0;
+      let lastIndex = 0; let match: RegExpExecArray | null; let key = 0;
       while ((match = regex.exec(node)) !== null) {
         if (match.index > lastIndex) parts.push(node.slice(lastIndex, match.index));
-        const n = Number(match[1]);
-        const src = map.get(n);
-        if (src) {
-          parts.push(
-            <a
-              key={`cite-${key++}`}
-              href={src.url}
-              target="_blank"
-              rel="noreferrer"
-              title={`${src.title} — ${src.domain}`}
-              className="ml-0.5 inline-flex items-center justify-center rounded-md bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary no-underline transition hover:bg-primary/20"
-            >
-              {n}
-            </a>,
-          );
-        } else {
-          parts.push(match[0]);
-        }
+        const n = Number(match[1]); const src = map.get(n);
+        if (src) parts.push(<a key={`cite-${key++}`} href={src.url} target="_blank" rel="noreferrer" title={`${src.title} — ${src.domain}`} className="ml-0.5 inline-flex items-center justify-center rounded-md bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary no-underline transition hover:bg-primary/20">{n}</a>);
+        else parts.push(match[0]);
         lastIndex = match.index + match[0].length;
       }
       if (lastIndex < node.length) parts.push(node.slice(lastIndex));
@@ -598,36 +440,19 @@ function renderCitations(children: React.ReactNode, sources?: Source[]): React.R
 function SourceStrip({ sources }: { sources: Source[] }) {
   return (
     <div className="rounded-xl border border-border/60 bg-card/60 p-3">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-        Sources · {sources.length}
-      </p>
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Sources · {sources.length}</p>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {sources.map((s) => (
-          <a
-            key={s.n}
-            href={s.url}
-            target="_blank"
-            rel="noreferrer"
-            className="group flex items-start gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 transition hover:border-primary/40 hover:shadow-soft"
-          >
-            <img
-              src={`https://www.google.com/s2/favicons?domain=${s.domain}&sz=32`}
-              alt=""
-              className="mt-0.5 h-4 w-4 rounded-sm"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
-              }}
-            />
+          <a key={s.n} href={s.url} target="_blank" rel="noreferrer"
+            className="group flex items-start gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 transition hover:border-primary/40 hover:shadow-soft">
+            <img src={`https://www.google.com/s2/favicons?domain=${s.domain}&sz=32`} alt="" className="mt-0.5 h-4 w-4 rounded-sm"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="grid h-4 w-4 shrink-0 place-items-center rounded bg-primary/10 text-[9px] font-semibold text-primary">
-                  {s.n}
-                </span>
+                <span className="grid h-4 w-4 shrink-0 place-items-center rounded bg-primary/10 text-[9px] font-semibold text-primary">{s.n}</span>
                 <span className="truncate text-[11px] text-muted-foreground">{s.domain}</span>
               </div>
-              <p className="mt-0.5 line-clamp-2 text-[12px] font-medium text-foreground group-hover:text-primary">
-                {s.title}
-              </p>
+              <p className="mt-0.5 line-clamp-2 text-[12px] font-medium text-foreground group-hover:text-primary">{s.title}</p>
             </div>
           </a>
         ))}

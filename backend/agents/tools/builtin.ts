@@ -6,25 +6,27 @@ import { notionTools } from "./notion.ts";
 import { githubTools } from "./github.ts";
 import { linearTools } from "./linear.ts";
 import { driveTools } from "./drive.ts";
+import { outlookTools } from "./outlook.ts";
+import { teamsTools } from "./teams.ts";
+import { jiraTools } from "./jira.ts";
+import { asanaTools } from "./asana.ts";
+import { hubspotTools } from "./hubspot.ts";
+import { zoomTools } from "./zoom.ts";
 
 const calculate: Tool<{ expression: string }, { result: number | string; expression: string }> = {
   name: "calculate",
-  description: "Evaluate a basic arithmetic expression. Supports + - * / % ( ) and decimals. Returns the numeric result.",
+  description: "Evaluate a basic arithmetic expression. Supports + - * / % ( ) and decimals.",
   parameters: {
     type: "object",
     properties: {
-      expression: {
-        type: "string",
-        description: "Arithmetic expression, e.g. '(1200 * 0.18) / 12'.",
-      },
+      expression: { type: "string", description: "Arithmetic expression, e.g. '(1200 * 0.18) / 12'." },
     },
     required: ["expression"],
   },
   async execute({ expression }) {
     if (typeof expression !== "string") throw new Error("expression must be a string");
-    if (!/^[\d+\-*/%().,\s]+$/.test(expression)) {
+    if (!/^[\d+\-*/%().,\s]+$/.test(expression))
       return { result: "refused: only digits, decimals, and + - * / % ( ) are allowed", expression };
-    }
     const result = Function(`"use strict"; return (${expression});`)() as number;
     return { result, expression };
   },
@@ -37,7 +39,7 @@ const recallMemory: Tool<{ query?: string; limit?: number }, { memories: string[
     type: "object",
     properties: {
       query: { type: "string", description: "Optional substring filter (case-insensitive)." },
-      limit: { type: "string", description: "Optional cap on number of memories returned (default 10, max 50)." },
+      limit: { type: "string", description: "Cap on number of memories (default 10, max 50)." },
     },
   },
   async execute({ query, limit }, ctx) {
@@ -71,4 +73,10 @@ export const defaultTools: Tool[] = [
   ...githubTools,
   ...linearTools,
   ...driveTools,
+  ...outlookTools,
+  ...teamsTools,
+  ...jiraTools,
+  ...asanaTools,
+  ...hubspotTools,
+  ...zoomTools,
 ];
