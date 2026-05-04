@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -10,6 +10,7 @@ import {
   Paperclip,
   X,
   Plug,
+  Check,
   Inbox,
   Calendar,
   MessageCircle,
@@ -27,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 type Source = { n: number; title: string; url: string; domain: string };
 type Msg = { role: "user" | "assistant"; content: string; sources?: Source[]; skills?: string[] };
 type Tier = "free" | "pro" | "elite";
+type Provider = "gmail" | "slack" | "notion" | "github" | "linear" | "drive";
 
 type Props = {
   tier: Tier;
@@ -47,15 +49,15 @@ const SUGGESTED = [
   { icon: ListChecks, label: "Weekly update", prompt: "Write my Friday weekly update from this week's tickets, PRs, and Slack notes." },
 ];
 
-const INTEGRATIONS: { name: string; icon: typeof Inbox; status: "connected" | "available" }[] = [
-  { name: "Gmail", icon: Inbox, status: "available" },
-  { name: "Calendar", icon: Calendar, status: "available" },
-  { name: "Slack", icon: MessageCircle, status: "available" },
-  { name: "Notion", icon: FileText, status: "available" },
-  { name: "GitHub", icon: GitBranch, status: "available" },
-  { name: "Linear", icon: ListChecks, status: "available" },
-  { name: "Drive", icon: Folder, status: "available" },
-  { name: "Voice", icon: Mic, status: "available" },
+const INTEGRATIONS: { name: string; icon: typeof Inbox; provider: Provider | null; sharesWith?: Provider }[] = [
+  { name: "Gmail", icon: Inbox, provider: "gmail" },
+  { name: "Calendar", icon: Calendar, provider: null, sharesWith: "gmail" },
+  { name: "Slack", icon: MessageCircle, provider: "slack" },
+  { name: "Notion", icon: FileText, provider: "notion" },
+  { name: "GitHub", icon: GitBranch, provider: "github" },
+  { name: "Linear", icon: ListChecks, provider: "linear" },
+  { name: "Drive", icon: Folder, provider: "drive" },
+  { name: "Voice", icon: Mic, provider: null },
 ];
 
 export function RazenAssistant({ tier, onCreditsChange }: Props) {
@@ -67,12 +69,65 @@ export function RazenAssistant({ tier, onCreditsChange }: Props) {
   const [attachment, setAttachment] = useState<{ name: string; dataUrl: string; type: string } | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [activeSkills, setActiveSkills] = useState<string[]>([]);
+  const [connected, setConnected] = useState<Set<Provider>>(new Set());
+  const [connecting, setConnecting] = useState<Provider | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const loadConnections = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase.from("connections").select("provider").eq("user_id", user.id);
+    setConnected(new Set((data ?? []).map((c: { provider: string }) => c.provider as Provider)));
+  }, [user]);
+
+  useEffect(() => {
+    void loadConnections();
+  }, [loadConnections]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const c = params.get("connected");
+    const e = params.get("error");
+    if (c) {
+      toast.success(`${c.charAt(0).toUpperCase() + c.slice(1)} connected.`);
+      window.history.replaceState({}, "", window.location.pathname);
+      void loadConnections();
+    } else if (e) {
+      toast.error(`Connection failed: ${e}`);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [loadConnections]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  const connectProvider = async (provider: Provider) => {
+    if (!user || connecting) return;
+    setConnecting(provider);
+    try {
+      const { data, error } = await supabase.functions.invoke(`integrations-${provider}-connect`);
+      if (error || !data?.url) {
+        toast.error(`Could not start ${provider} connection${error?.message ? `: ${error.message}` : ""}`);
+        return;
+      }
+      const popup = window.open(data.url as string, "_blank", "width=600,height=720");
+      if (!popup) {
+        window.location.href = data.url as string;
+        return;
+      }
+      const interval = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(interval);
+          void loadConnections();
+        }
+      }, 800);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Could not connect ${provider}`);
+    } finally {
+      setConnecting(null);
+    }
+  };
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -218,7 +273,12 @@ export function RazenAssistant({ tier, onCreditsChange }: Props) {
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-10">
           {messages.length === 0 ? (
-            <Hero onPick={(p) => setInput(p)} />
+            <Hero
+              onPick={(p) => setInput(p)}
+              connected={connected}
+              connecting={connecting}
+              onConnect={connectProvider}
+            />
           ) : (
             <div className="space-y-6">
               {activeSkills.length > 0 && (
@@ -347,7 +407,17 @@ export function RazenAssistant({ tier, onCreditsChange }: Props) {
   );
 }
 
-function Hero({ onPick }: { onPick: (p: string) => void }) {
+function Hero({
+  onPick,
+  connected,
+  connecting,
+  onConnect,
+}: {
+  onPick: (p: string) => void;
+  connected: Set<Provider>;
+  connecting: Provider | null;
+  onConnect: (p: Provider) => void;
+}) {
   return (
     <div className="space-y-12">
       <div className="text-center">
@@ -400,21 +470,48 @@ function Hero({ onPick }: { onPick: (p: string) => void }) {
         <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
           {INTEGRATIONS.map((it) => {
             const Icon = it.icon;
+            const linkedProvider = it.provider ?? it.sharesWith ?? null;
+            const isConnected = linkedProvider ? connected.has(linkedProvider) : false;
+            const isConnecting = it.provider !== null && connecting === it.provider;
+            const clickable = it.provider !== null;
+            const handleClick = () => {
+              if (!clickable || isConnected) return;
+              onConnect(it.provider as Provider);
+            };
+            const status = isConnected
+              ? "Connected"
+              : isConnecting
+              ? "Opening…"
+              : it.sharesWith
+              ? `Connects with ${it.sharesWith.charAt(0).toUpperCase() + it.sharesWith.slice(1)}`
+              : clickable
+              ? "Tap to connect"
+              : "Coming soon";
             return (
-              <div
+              <button
                 key={it.name}
-                className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-4 py-3"
+                type="button"
+                onClick={handleClick}
+                disabled={!clickable || isConnected || isConnecting}
+                className={`flex items-center gap-3 rounded-xl border bg-card/40 px-4 py-3 text-left transition ${
+                  isConnected
+                    ? "border-primary/40 bg-primary/5"
+                    : clickable
+                    ? "border-border/70 hover:border-primary/40 hover:bg-card hover:shadow-soft"
+                    : "border-border/70 opacity-70"
+                }`}
               >
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-background">
                   <Icon className="h-4 w-4 text-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold">{it.name}</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {it.status === "connected" ? "Connected" : "Tap to connect"}
+                  <div className="flex items-center gap-1.5 text-sm font-semibold">
+                    {it.name}
+                    {isConnected && <Check className="h-3.5 w-3.5 text-primary" />}
                   </div>
+                  <div className="text-[11px] text-muted-foreground">{status}</div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
